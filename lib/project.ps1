@@ -161,10 +161,158 @@ function Get-StackComposeDirFromManifest {
     Join-Path $proj ($rel -replace '/', '\')
 }
 
-function Get-ComposeAppServiceName {
-    $app = Get-DeployEnvValue "COMPOSE_APP_SERVICE"
-    if ($app) { return $app }
-    "$(Get-ComposeSlug)-app"
+function Get-InfraComposeDirFromManifest {
+    $proj = Get-ProjectRootFromManifest
+    if (-not $proj) { throw "geostat.ops.json not found" }
+    $rel = Get-ManifestField "stack.infraComposeDir" "ops/compose/infra"
+    Join-Path $proj ($rel -replace '/', '\')
+}
+
+function Get-ManifestInfraServices {
+    $mf = Get-ProjectManifestPath
+    if (-not $mf) { return @() }
+    $m = Get-Content $mf -Raw | ConvertFrom-Json
+    if ($m.stack.infra -and $m.stack.infra.services) {
+        $arr = $m.stack.infra.services
+    }
+    else {
+        $arr = $m.stack.infraProfiles
+    }
+    if ($null -eq $arr) { return @() }
+    if ($arr -is [string]) { return @($arr) }
+    return @($arr | ForEach-Object { [string]$_ } | Where-Object { $_ })
+}
+
+function Get-ManifestInfraComposeFileOverride {
+    $mf = Get-ProjectManifestPath
+    if (-not $mf) { return @() }
+    $m = Get-Content $mf -Raw | ConvertFrom-Json
+    if ($m.stack.infra -and $m.stack.infra.composeFiles) {
+        $arr = $m.stack.infra.composeFiles
+    }
+    else {
+        $arr = $m.stack.infraComposeFiles
+    }
+    if ($null -eq $arr) { return @() }
+    return @($arr | ForEach-Object { [string]$_ } | Where-Object { $_ })
+}
+
+function Get-InfraComposeIncludeFiles {
+    $dir = Get-InfraComposeDirFromManifest
+    $override = Get-ManifestInfraComposeFileOverride
+    if ($override.Count -gt 0) {
+        foreach ($rel in $override) {
+            $full = Join-Path $dir ($rel -replace '/', '\')
+            if (-not (Test-Path $full)) {
+                throw "stack.infra.composeFiles missing: $full"
+            }
+        }
+        return $override
+    }
+    $base = "docker-compose.base.yml"
+    $monolith = "docker-compose.yml"
+    $services = Get-ManifestInfraServices
+    $list = [System.Collections.ArrayList]@()
+    if (Test-Path (Join-Path $dir $base)) {
+        [void]$list.Add($base)
+        foreach ($svc in $services) {
+            $frag = "services/$svc.yml"
+            $full = Join-Path $dir $frag
+            if (-not (Test-Path $full)) {
+                throw "stack.infra.services: missing fragment $frag (add yaml or override stack.infra.composeFiles)"
+            }
+            [void]$list.Add($frag)
+        }
+        return @($list)
+    }
+    if (Test-Path (Join-Path $dir $monolith)) {
+        return @($monolith)
+    }
+    throw "No docker-compose.base.yml or docker-compose.yml under $dir"
+}
+
+function Add-InfraComposeFileArgs {
+    param([System.Collections.ArrayList]$Target)
+    $files = Get-InfraComposeIncludeFiles
+    foreach ($rel in $files) {
+        [void]$Target.Add("-f")
+        [void]$Target.Add($rel)
+    }
+    if ($files.Count -eq 1 -and $files[0] -eq "docker-compose.yml") {
+        foreach ($svc in (Get-ManifestInfraServices)) {
+            [void]$Target.Add("--profile")
+            [void]$Target.Add($svc)
+        }
+    }
+}
+
+function Get-InfraCatalogFilePaths {
+    $paths = [System.Collections.ArrayList]@()
+    $kitRoot = if ($env:GEOSTAT_KIT_ROOT) { $env:GEOSTAT_KIT_ROOT } else { Get-OpsPackageRoot }
+    $kitCat = Join-Path $kitRoot "compose\infra-catalog.json"
+    if (Test-Path $kitCat) { [void]$paths.Add($kitCat) }
+    $consumerCat = Join-Path (Get-InfraComposeDirFromManifest) "infra-catalog.json"
+    if (Test-Path $consumerCat) { [void]$paths.Add($consumerCat) }
+    return $paths
+}
+
+function Get-InfraMergedCatalogModules {
+    $merged = @{}
+    foreach ($catPath in (Get-InfraCatalogFilePaths)) {
+        $data = Get-Content $catPath -Raw | ConvertFrom-Json
+        foreach ($prop in $data.modules.PSObject.Properties) {
+            $merged[$prop.Name] = $prop.Value
+        }
+    }
+    return $merged
+}
+
+function Get-InfraTunnelForwards {
+    $services = Get-ManifestInfraServices
+    if (-not $services -or $services.Count -eq 0) {
+        throw "stack.infra.services is empty - declare enabled stores in geostat.ops.json"
+    }
+    $modules = Get-InfraMergedCatalogModules
+    $seen = @{}
+    $out = [System.Collections.ArrayList]@()
+    foreach ($sid in $services) {
+        if (-not $modules.ContainsKey($sid)) {
+            throw "stack.infra.services: '$sid' missing in infra-catalog (kit compose/infra-catalog.json or consumer ops/compose/infra/infra-catalog.json)"
+        }
+        $mod = $modules[$sid]
+        if (-not $mod.tunnel) { continue }
+        foreach ($spec in @($mod.tunnel)) {
+            $envKey = if ($spec.PSObject.Properties['env']) { [string]$spec.env } else { [string]$spec }
+            $def = ""
+            if ($spec.PSObject.Properties['default']) { $def = [string]$spec.default }
+            $port = Get-SecretsEnvValue -Module "infra" -Key $envKey
+            if (-not $port) { $port = $def }
+            if (-not $port) {
+                throw "infra tunnel: set $envKey in ops/config/infra/.env.dev (service '$sid')"
+            }
+            if ($seen[$port]) { continue }
+            $seen[$port] = $true
+            [void]$out.Add([pscustomobject]@{ Local = $port; Remote = $port; Service = $sid; Env = $envKey })
+        }
+    }
+    if ($out.Count -eq 0) {
+        throw "No tunnel ports for stack.infra.services - add tunnel[] to catalog modules"
+    }
+    return $out
+}
+
+function Get-InfraSyncRelativePaths {
+    $paths = [System.Collections.ArrayList]@(Get-InfraComposeIncludeFiles)
+    $dir = Get-InfraComposeDirFromManifest
+    $prod = "docker-compose.prod.yml"
+    if ((Test-Path (Join-Path $dir $prod)) -and -not ($paths -contains $prod)) {
+        [void]$paths.Add($prod)
+    }
+    $readme = "README.md"
+    if ((Test-Path (Join-Path $dir $readme)) -and -not ($paths -contains $readme)) {
+        [void]$paths.Add($readme)
+    }
+    return @($paths | Select-Object -Unique)
 }
 
 function Get-DefaultRemoteDeployPathBase {

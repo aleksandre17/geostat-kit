@@ -100,15 +100,26 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
 
     ci = ctx.manifest.get("ci") or {}
     if isinstance(ci, dict):
-        for key in ("integration", "prepareEnv", "waitHealth"):
+        for key in ("integration", "prepareEnv", "waitHealth", "waitStackHealth"):
             rel = ci.get(key)
             if rel and not (root / str(rel)).is_file():
                 warnings.append(f"ci.{key}: file missing ({rel})")
 
+    for mid, cfg in (ctx.manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        sm = str(cfg.get("secretsModule", mid))
+        sdir = ctx.secrets_folder_path(sm)
+        ex = sdir / ".env.example"
+        if sdir.is_dir() and not ex.is_file():
+            warnings.append(f"modules.{mid}: missing secrets example ({ex.relative_to(root)})")
+        elif not sdir.is_dir() and not ex.is_file():
+            warnings.append(f"modules.{mid}: secrets dir missing ({sdir.relative_to(root)})")
+
     api_ids = ctx.module_ids_for_role("api")
     if len(api_ids) > 1:
         warnings.append(
-            f"modules: multiple role=api ({', '.join(api_ids)}); CI uses index 0 — set explicit ci module if needed"
+            f"modules: multiple role=api ({', '.join(api_ids)}); set ci.healthModules explicitly"
         )
 
     seen_sm: dict[str, str] = {}
@@ -125,6 +136,10 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
         files = [c["file"] for c in items]
         if len(files) != len(set(files)):
             errs.append(f"modules.{mid}.credentials: duplicate file names")
+
+    from lib.stack_deploy import validate_stack_deploy
+
+    warnings.extend(validate_stack_deploy(ctx.manifest))
 
     return errs, warnings
 

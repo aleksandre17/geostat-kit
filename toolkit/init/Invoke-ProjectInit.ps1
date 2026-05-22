@@ -109,12 +109,9 @@ function Update-DeployEnvAbstractNames {
     $slug = Get-ProjectSlug $Root
     $lines = Get-Content $path -Encoding UTF8
     $map = @{
-        'DEPLOY_PROJECT'             = $slug
-        'COMPOSE_PROJECT_NAME'       = $slug
-        'COMPOSE_API_SERVICE'        = "$slug-api"
-        'COMPOSE_APP_SERVICE'        = "$slug-app"
-        'COMPOSE_WORKER_SERVICE'     = "$slug-worker"
-        'DOCKER_NETWORK'             = "$slug-net"
+        'DEPLOY_PROJECT'       = $slug
+        'COMPOSE_PROJECT_NAME' = $slug
+        'DOCKER_NETWORK'       = "$slug-net"
     }
     $seen = @{}
     $out = [System.Collections.Generic.List[string]]::new()
@@ -255,7 +252,7 @@ if (-not $SkipSeed) {
     if ($nginxEx -and $nginxTg) {
         Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
     }
-    Write-Step "Abstract deploy identity (COMPOSE_* from repo folder, not branded names)"
+    Write-Step "Abstract deploy identity (COMPOSE_PROJECT_NAME / network from repo folder; service names from manifest)"
     Update-DeployEnvAbstractNames -Root $ProjectRoot -Force:$ForceExamples
 }
 

@@ -23,7 +23,19 @@ case "$CMD" in
   compose-gen) exec python3 "$PKG/compose/build.py" ;;
   nginx-gen) exec python3 "$PKG/adapters/render_nginx.py" ;;
   stack-deploy) exec bash "$PKG/toolkit/deploy/stack-remote.sh" "$@" ;;
-  infra) exec bash "$PKG/toolkit/infra/ensure-prereqs.sh" "$@" ;;
+  infra)
+    if [[ $# -gt 0 ]]; then
+      if command -v pwsh >/dev/null 2>&1; then
+        exec pwsh -NoProfile -ExecutionPolicy Bypass -File "$PKG/toolkit/infra/Invoke-Infra.ps1" "$@"
+      fi
+      if command -v powershell.exe >/dev/null 2>&1; then
+        exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PKG/toolkit/infra/Invoke-Infra.ps1" "$@"
+      fi
+      echo "ERROR: pwsh or powershell required for: geostat infra $*"
+      exit 1
+    fi
+    exec bash "$PKG/toolkit/infra/ensure-prereqs.sh"
+    ;;
   stack) exec bash "$PKG/toolkit/stack/compose.sh" "$@" ;;
   *)
     exec powershell -ExecutionPolicy Bypass -File "$ROOT/tools/geostat.ps1" "$CMD" "$@" 2>/dev/null \

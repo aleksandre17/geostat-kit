@@ -196,20 +196,9 @@ class ProjectContext:
                 out.append(folder)
         return out
 
-    def compose_service_names(self) -> dict[str, str]:
-        deploy = self.secrets_root / "deploy.env"
-        env: dict[str, str] = {}
-        if deploy.is_file():
-            for line in deploy.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, _, v = line.partition("=")
-                env[k.strip()] = v.strip().strip("\"'")
-        slug = env.get("COMPOSE_PROJECT_NAME") or env.get("DEPLOY_PROJECT") or self.root.name
-        slug = slug.lower().replace("_", "-")
-        return {
-            "api": env.get("COMPOSE_API_SERVICE") or f"{slug}-api",
-            "app": env.get("COMPOSE_APP_SERVICE") or f"{slug}-app",
-            "worker": env.get("COMPOSE_WORKER_SERVICE") or f"{slug}-worker",
-        }
+    def compose_service_names(self) -> dict[str, Any]:
+        from lib.compose_identity import compose_service_names as resolve_names
+        from lib.compose_identity import load_deploy_env
+
+        deploy = load_deploy_env(self.secrets_root)
+        return resolve_names(self.manifest, deploy, self.root.name)

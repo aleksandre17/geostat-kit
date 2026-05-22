@@ -66,3 +66,27 @@ function Invoke-ModuleLayoutSimulator {
 function Get-InferredCliAliases {
     Get-CliAliasesFromManifest
 }
+
+function Get-ModuleComposeServiceName {
+    param([Parameter(Mandatory = $true)][string]$ModuleId)
+    $out = Invoke-GeostatModulesApi @("compose-service", $ModuleId)
+    if ($out) { return $out.Trim() }
+    return $null
+}
+
+function Get-ComposeAppServiceName {
+    $n = Get-ModuleComposeServiceName -ModuleId "frontend"
+    if ($n) { return $n }
+    $fromDeploy = Get-DeployEnvValue "COMPOSE_APP_SERVICE"
+    if ($fromDeploy) { return $fromDeploy }
+    "$(Get-ComposeSlug)-app"
+}
+
+function Write-StackEndpointHints {
+    $lines = Invoke-GeostatModulesApi @("stack-endpoints")
+    if (-not $lines) { return }
+    foreach ($line in ($lines -split "`n")) {
+        $t = $line.Trim()
+        if ($t) { Write-Host "  $t" -ForegroundColor Gray }
+    }
+}

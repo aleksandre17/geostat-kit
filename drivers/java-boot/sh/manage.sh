@@ -238,7 +238,7 @@ case "$ACTION" in
                 d="$(remote_path "$s")"
                 ssh "$SERVER" "bash -c 'cd \"$d\" && $COMPOSE down -v --rmi local 2>/dev/null; true'"
             done
-            ssh "$SERVER" "docker image prune -f"
+            manage_prune_deployed_images
             for s in "${SERVICES[@]}"; do
                 d="$(remote_path "$s")"
                 ssh "$SERVER" "docker run --rm -v \"$d:/target\" alpine find /target -mindepth 1 -delete 2>/dev/null || true"

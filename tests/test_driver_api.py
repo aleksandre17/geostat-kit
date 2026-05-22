@@ -54,12 +54,20 @@ class TestManifest:
     def test_fe_alias(self, repo_root: Path, pkg_root: Path):
         assert _run_api(repo_root, pkg_root, "alias", "fe") == "frontend"
 
-    def test_stack_deploy_includes_frontend_dist(self, manifest: dict):
-        steps = manifest["stackDeploy"]["steps"]
-        fe = [s for s in steps if s["module"] == "frontend"]
-        assert len(fe) == 1
-        assert fe[0]["command"] == "deploy"
-        assert "dist" in fe[0]["args"]
+    def test_stack_deploy_from_compose_modules(self, repo_root: Path, pkg_root: Path, manifest: dict):
+        """stackDeploy.steps omitted — stack.composeModules drives remote deploy."""
+        assert "stackDeploy" not in manifest or not manifest.get("stackDeploy", {}).get("steps")
+        out = _run_api(repo_root, pkg_root, "stack-steps", "--prod")
+        lines = [ln for ln in out.splitlines() if ln.strip()]
+        modules = [ln.split("\t")[0] for ln in lines]
+        assert "backend" in modules
+        assert "retrieval" in modules
+        assert "ingestion" in modules
+        assert "frontend" in modules
+        assert modules.index("backend") < modules.index("ingestion")
+        assert modules.index("ingestion") < modules.index("frontend")
+        fe_line = [ln for ln in lines if ln.startswith("frontend\t")][0]
+        assert "dist" in fe_line
 
 
 class TestDriverPaths:

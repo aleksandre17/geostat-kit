@@ -31,3 +31,27 @@ function Get-GeostatSshExtraArgs {
     }
     return $args
 }
+
+function Invoke-GeostatRemoteBash {
+    param([string]$Script)
+    $server = Get-DeployEnvValue "DEPLOY_SERVER"
+    if (-not $server) { throw "DEPLOY_SERVER not set in ops/config/deploy.env" }
+    $sshExtra = @(Get-GeostatSshExtraArgs)
+    $oneLine = (($Script -replace "`r", "") -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ' '
+    $escaped = $oneLine -replace '\\', '\\\\' -replace '"', '\"'
+    & ssh @sshExtra $server "bash -lc `"$escaped`"" 2>&1 | ForEach-Object {
+        Write-Host "[ssh] $_" -ForegroundColor DarkGray
+    }
+    return $LASTEXITCODE
+}
+
+function Invoke-GeostatScp {
+    param([string]$LocalPath, [string]$RemoteDest)
+    $server = Get-DeployEnvValue "DEPLOY_SERVER"
+    if (-not $server) { throw "DEPLOY_SERVER not set" }
+    $sshExtra = @(Get-GeostatSshExtraArgs)
+    & scp @sshExtra $LocalPath "${server}:${RemoteDest}" 2>&1 | ForEach-Object {
+        Write-Host "[scp] $_" -ForegroundColor DarkGray
+    }
+    return $LASTEXITCODE
+}

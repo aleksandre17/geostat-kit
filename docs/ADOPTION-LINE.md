@@ -17,8 +17,10 @@
 | — | `tools/geostat.ps1` (1 ხაზი delegate) |
 | — | `ops/ci/` (პროექტის ინტეგრაცია) |
 | — | გენერირებული `docker-compose*.yml`, `apps/backend/ops.modules` |
+| `toolkit/infra/Invoke-Infra.ps1` | `ops/compose/infra/*.yml` + `ops/config/infra/.env.*` (პროექტის compose/პორტები) |
 
-წესი: დომენური სახელი, API key, ბიზნეს-ლოგიკა → **პროექტი**. SSH/Docker/Gradle/npm ოპს ხელსაწყო → **პაკეტი**.
+წესი: დომენური სახელი, API key, ბიზნეს-ლოგიკა → **პროექტი**. SSH/Docker/Gradle/npm ოპს ხელსაწყო → **პაკეტი**.  
+`geostat infra` = **პაკეტი** (agnostic driver); consumer `services/*.yml` + manifest `stack.infra.services`; remote path `{DEPLOY_PROJECT}/infra/{INFRA_SLUG}/`. იხ. `docs/PACKAGE-PRINCIPLES.md`.
 
 ---
 
@@ -203,12 +205,12 @@ exec bash "$ROOT/kits/geostat-kit/cli/geostat.sh" "$@"
 | ბრძანება | დანიშნულება |
 |----------|-------------|
 | `geostat help` | მოდულები + driver types |
-| `geostat compose-gen` | catalog → docker-compose ფაილები |
+| `geostat compose-gen` | catalog + manifest (`stack.composeModules`) → docker-compose ფაილები |
 | `geostat stack up -d --build` | local API+UI |
 | `geostat mod <moduleId> deploy …` | ნებისმიერი მოდული |
 | `geostat be deploy all --prod` | alias → `modules.backend` |
 | `geostat fe deploy dist -Environment prod` | alias → `modules.frontend` |
-| `geostat stack-deploy --prod` | `stackDeploy.steps` |
+| `geostat stack-deploy --prod` | `stack.composeModules` → auto steps (or `stackDeploy.steps`) |
 
 ---
 
@@ -243,8 +245,8 @@ Legacy სერვერი: [scaffold/profiles/legacy-server.env.example](../s
 
 1. დაიწყე [catalog.minimal.json](../scaffold/ops/compose/catalog.minimal.json)-ით.
 2. დაამატე `templates` (YAML ფრაგმენტები) და `targets` (რომელი ფაილი რა service-ებს იღებს).
-3. `features.worker: true|false` — worker service on/off.
-4. `deploy.env` / catalog ფორმატები ავტომატურად უჯდება `COMPOSE_*`, `DOCKER_NETWORK` სახელებს.
+3. `features.worker: true|false` — embedded `apps/backend/worker` on/off (not manifest `ingestion`; use **false** when worker role is a separate module).
+4. `deploy.env`: `COMPOSE_PROJECT_NAME`, `DOCKER_NETWORK`; სერვისის სახელები — manifest + `compose_identity` (`compose-gen`). `COMPOSE_*_SERVICE` მხოლოდ legacy პროფილში.
 
 **არ შეცვალო ხელით** ფაილებს, რომლებც იწყება `# GENERATED` — მხოლოდ `compose-gen`.
 

@@ -33,7 +33,7 @@
 | `geostat compose-gen` | `compose/build.py` |
 | `geostat nginx-gen` | `adapters/render_nginx.py` |
 | `geostat stack` | `toolkit/stack/compose.ps1` |
-| `geostat infra` | `toolkit/infra/ensure-prereqs.sh` |
+| `geostat infra` | `toolkit/infra/Invoke-Infra.ps1` (+ `ensure-prereqs.sh` when no subcommand) |
 | `geostat init` | `toolkit/init/` → `lib/ci_prepare.py` |
 | `be deploy` / `fe deploy` | `toolkit/deploy/` via drivers |
 

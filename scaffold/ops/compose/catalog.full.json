@@ -86,46 +86,19 @@
     },
     "ops/compose/stack/docker-compose.yml": {
       "comment": "# Full stack dev — full stack up -d --build\nname: {compose_project_name}\n\n",
-      "services": [
-        "api_dev",
-        "worker_dev",
-        "app_stack_dev"
-      ],
-      "services_if": {
-        "worker_dev": "worker"
-      },
+      "manifestStack": "dev",
       "fmt": {
-        "api_context": "../../apps/backend",
-        "api_dockerfile_dev": "src/Dockerfile.dev",
-        "worker_context": "../../apps/backend",
-        "worker_dockerfile_dev": "worker/Dockerfile.dev",
-        "secrets_backend": "../../ops/config/backend",
         "health_interval": "15s",
         "health_retries": "5",
-        "health_start": "60s",
-        "app_context": "../../apps/frontend",
-        "app_dev_mount": "../../apps/frontend"
+        "health_start": "60s"
       },
       "networks": "net_internal"
     },
     "ops/compose/stack/docker-compose.prod.yml": {
       "comment": "# Full stack prod — full stack -Prod up -d --build\nname: {compose_project_name}\n\n",
-      "services": [
-        "api_prod",
-        "worker_prod",
-        "app_stack_prod"
-      ],
-      "services_if": {
-        "worker_prod": "worker"
-      },
+      "manifestStack": "prod",
       "fmt": {
-        "api_build_context": "../../apps/backend/src",
-        "api_dockerfile_prod": "Dockerfile",
-        "worker_build_context": "../../apps/backend",
-        "worker_dockerfile_prod": "worker/Dockerfile",
-        "secrets_backend": "../../ops/config/backend",
-        "api_logs": "../../apps/backend/logs",
-        "app_context": "../../apps/frontend"
+        "api_logs": "../../apps/backend/logs"
       },
       "networks": "net_internal",
       "volumes": "vols_prod"

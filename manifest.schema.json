@@ -12,16 +12,66 @@
     "secrets": { "type": "string" },
     "compose": {
       "type": "object",
+      "description": "Consumer compose catalog and generated artifact paths",
       "required": ["catalog"],
       "properties": {
-        "catalog": { "type": "string" },
-        "syncModules": { "type": "string" }
+        "catalog": {
+          "type": "string",
+          "description": "Path to ops/compose/catalog.json (compose-gen templates + targets)"
+        },
+        "syncModules": {
+          "type": "string",
+          "description": "Generated Gradle/docker registry path (e.g. apps/backend/ops.modules)"
+        }
       }
     },
     "stack": {
       "type": "object",
+      "description": "Full-stack compose, remote deploy module list, and infra wiring",
       "properties": {
-        "composeDir": { "type": "string" }
+        "composeDir": {
+          "type": "string",
+          "description": "Generated full-stack compose output dir (default: ops/compose/stack)"
+        },
+        "infraComposeDir": {
+          "type": "string",
+          "description": "Consumer infra compose root (docker-compose.base.yml + services/*.yml)"
+        },
+        "networkName": {
+          "type": "string",
+          "description": "Default Docker network for stack + infra (overridable via DOCKER_NETWORK in deploy.env)"
+        },
+        "composeModules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Module ids for stack compose-gen and stack-deploy auto-steps (default: all modules)"
+        },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional filter for stack endpoint hints only (geostat stack up URLs); default: all catalog roles"
+        },
+        "composeNaming": {
+          "type": "string",
+          "enum": ["manifest"],
+          "description": "Compose service keys from modules.* via compose_identity (deploy.env COMPOSE_* = legacy overrides only)"
+        },
+        "infra": {
+          "type": "object",
+          "description": "Data-store modules for geostat infra (agnostic; consumer owns yaml)",
+          "properties": {
+            "services": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Module ids → services/<id>.yml merged with docker-compose.base.yml"
+            },
+            "composeFiles": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Full override: explicit -f list relative to infraComposeDir"
+            }
+          }
+        }
       }
     },
     "cli": {
@@ -37,8 +87,14 @@
     "stackDeploy": {
       "type": "object",
       "properties": {
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Module ids for remote stack-deploy (default: stack.composeModules, then all modules)"
+        },
         "steps": {
           "type": "array",
+          "description": "Explicit deploy steps; omit to auto-generate from stack.composeModules (role order: api, worker, ui)",
           "items": {
             "type": "object",
             "required": ["module", "command"],
@@ -70,8 +126,11 @@
             "enum": ["ui", "api", "worker", "gateway", "data", "other"],
             "description": "Logical role for stack order, layout, and default CLI shortcuts"
           },
-          "path": { "type": "string" },
-          "secretsModule": { "type": "string" },
+          "path": { "type": "string", "description": "App source dir relative to project root (e.g. apps/backend)" },
+          "secretsModule": {
+            "type": "string",
+            "description": "Folder under secrets root for ops/config (often same as module id)"
+          },
           "credentials": {
             "type": "array",
             "description": "Credential files under secretsModule (overrides global adapters.gcp for this module)",
@@ -90,7 +149,10 @@
             "type": "string",
             "description": "Deprecated — use package drivers; optional wrapper path only"
           },
-          "target": { "type": "string" },
+          "target": {
+            "type": "string",
+            "description": "Remote deploy path segment and compose name suffix (default: module id)"
+          },
           "debug": {
             "type": "object",
             "description": "VS Code Run and Debug (optional; java-boot auto-detects *Application.java)",
@@ -161,7 +223,12 @@
       "properties": {
         "integration": { "type": "string" },
         "prepareEnv": { "type": "string" },
-        "waitHealth": { "type": "string" }
+        "waitHealth": { "type": "string" },
+        "waitStackHealth": { "type": "string" },
+        "healthModules": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "additionalProperties": false
     }

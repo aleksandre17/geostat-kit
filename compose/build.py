@@ -4,28 +4,14 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
 HEADER = "# GENERATED — do not edit. Run: geostat compose-gen\n\n"
-
-DEPLOY_KEYS = (
-    "DEPLOY_PROJECT",
-    "COMPOSE_PROJECT_NAME",
-    "COMPOSE_API_SERVICE",
-    "COMPOSE_APP_SERVICE",
-    "COMPOSE_WORKER_SERVICE",
-    "DOCKER_NETWORK",
-    "GEOSTAT_DOCKER_NETWORK",
-    "API_PORT",
-    "WORKER_PORT",
-    "DEPLOY_HOST_PORT",
-    "APP_DEV_CONTAINER_PORT",
-)
-
 
 def find_project_root() -> Path:
     from lib.manifest_defaults import legacy_root_discovery_enabled
@@ -60,66 +46,14 @@ def catalog_path(root: Path, manifest: dict) -> Path:
     return root / rel
 
 
-def slugify(text: str) -> str:
-    s = re.sub(r"[^a-zA-Z0-9._-]+", "-", text.strip()).strip("-").lower()
-    return s or "app"
-
-
-def parse_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not path.is_file():
-        return out
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.strip()
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
-            val = val[1:-1]
-        if key and val:
-            out[key] = val
-    return out
-
-
-def load_deploy_overrides(root: Path) -> dict[str, str]:
+def global_fmt(root: Path) -> dict[str, str]:
+    from lib.compose_identity import build_global_fmt, load_deploy_env
     from lib.manifest_defaults import default_field
 
-    secrets = root / load_manifest(root).get("secrets") or default_field("secrets") or "ops/config"
-    deploy = parse_env_file(secrets / "deploy.env")
-    for key in DEPLOY_KEYS:
-        if key in os.environ and os.environ[key]:
-            deploy[key] = os.environ[key]
-    return deploy
-
-
-def global_fmt(root: Path) -> dict[str, str]:
-    deploy = load_deploy_overrides(root)
-    repo_name = root.name
-    compose_slug = slugify(deploy.get("COMPOSE_PROJECT_NAME") or repo_name)
-    api_svc = deploy.get("COMPOSE_API_SERVICE") or f"{compose_slug}-api"
-    app_svc = deploy.get("COMPOSE_APP_SERVICE") or f"{compose_slug}-app"
-    network = (
-        deploy.get("DOCKER_NETWORK")
-        or deploy.get("GEOSTAT_DOCKER_NETWORK")
-        or f"{compose_slug}-net"
-    )
-    worker_svc = deploy.get("COMPOSE_WORKER_SERVICE") or f"{compose_slug}-worker"
-    compose_name = deploy.get("COMPOSE_PROJECT_NAME") or repo_name
-    return {
-        "compose_project_name": compose_name,
-        "api_service": api_svc,
-        "api_image": api_svc,
-        "app_service": app_svc,
-        "app_image": app_svc,
-        "worker_service": worker_svc,
-        "worker_image": worker_svc,
-        "network_key": network.replace(".", "-"),
-        "network_name": network,
-        "api_storage_vol": f"{api_svc}-storage",
-        "api_uploads_vol": f"{api_svc}-uploads",
-    }
+    manifest = load_manifest(root)
+    secrets_rel = manifest.get("secrets") or default_field("secrets") or "ops/config"
+    deploy = load_deploy_env(root / secrets_rel)
+    return build_global_fmt(manifest=manifest, deploy=deploy, repo_name=root.name)
 
 
 def load_catalog(root: Path) -> tuple[dict, dict, dict]:
@@ -150,10 +84,47 @@ def render(templates: dict, services: list[str], fmt: dict) -> str:
     return "services:\n" + "".join(templates[key].format(**fmt) for key in services)
 
 
-def build_target(templates: dict, spec: dict, fmt_global: dict, features: dict) -> str:
+def build_target(
+    templates: dict,
+    spec: dict,
+    fmt_global: dict,
+    features: dict,
+    *,
+    root: Path,
+    target_path: Path,
+) -> str:
     fmt = {**fmt_global, **spec.get("fmt", {})}
-    services = resolve_services(spec, features)
-    body = render(templates, services, fmt)
+    if spec.get("manifestStack"):
+        from manifest_compose import build_manifest_stack_services
+        from lib.project_context import ProjectContext
+
+        profile = str(spec["manifestStack"])
+        ctx = ProjectContext(root=root, manifest=load_manifest(root))
+        body = "services:\n" + build_manifest_stack_services(
+            ctx=ctx,
+            profile=profile,
+            compose_dir=target_path.parent,
+            fmt_global=fmt_global,
+            fmt_extra=spec.get("fmt", {}),
+            features=features,
+        )
+    elif spec.get("manifestModule"):
+        from manifest_compose import build_single_module_compose
+        from lib.project_context import ProjectContext
+
+        profile = str(spec.get("manifestProfile") or "dev")
+        ctx = ProjectContext(root=root, manifest=load_manifest(root))
+        body = "services:\n" + build_single_module_compose(
+            ctx=ctx,
+            module_id=str(spec["manifestModule"]),
+            profile=profile,
+            compose_dir=target_path.parent,
+            fmt_global=fmt_global,
+            fmt_extra=spec.get("fmt", {}),
+        )
+    else:
+        services = resolve_services(spec, features)
+        body = render(templates, services, fmt)
     comment = spec.get("comment", "")
     if comment:
         comment = comment.format(**fmt)
@@ -173,7 +144,9 @@ def main() -> int:
     for path, spec in targets.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            build_target(templates, spec, fmt_global, features),
+            build_target(
+                templates, spec, fmt_global, features, root=root, target_path=path
+            ),
             encoding="utf-8",
             newline="\n",
         )

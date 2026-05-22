@@ -109,10 +109,9 @@ def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]
 
 
 def stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    sd = manifest.get("stackDeploy")
-    if sd and isinstance(sd.get("steps"), list):
-        return sd["steps"]
-    return default_stack_deploy_steps(manifest)
+    from lib.stack_deploy import stack_deploy_steps as _steps
+
+    return _steps(manifest)
 
 
 def substitute_stack_args(args: list[Any], environment: str) -> list[str]:

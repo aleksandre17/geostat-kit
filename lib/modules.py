@@ -92,28 +92,7 @@ def layout_simulator_for_type(driver_type: str) -> str | None:
 
 
 def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    """Role-ordered deploy plan when stackDeploy omitted: api/worker → ui."""
-    steps: list[dict[str, Any]] = []
-    mods = _modules(manifest)
-    order = ("api", "worker", "gateway", "data", "ui", "other")
-    seen: set[str] = set()
-    for role in order:
-        for mid in modules_by_role(manifest, role):
-            if mid in seen:
-                continue
-            seen.add(mid)
-            typ = mods[mid].get("type", "")
-            if typ == "java-boot":
-                steps.append({"module": mid, "command": "deploy", "args": ["all"]})
-            elif typ == "node-vite":
-                steps.append(
-                    {
-                        "module": mid,
-                        "command": "deploy",
-                        "args": ["dist", "-Environment", "{environment}"],
-                    }
-                )
-    for mid in mods:
-        if mid not in seen:
-            steps.append({"module": mid, "command": "deploy", "args": []})
-    return steps
+    """Role-ordered deploy plan when stackDeploy.steps omitted."""
+    from lib.stack_deploy import default_stack_deploy_steps as _steps
+
+    return _steps(manifest)

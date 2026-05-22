@@ -8,7 +8,7 @@ param(
 
     [Parameter(ValueFromRemainingArguments = $true)]
 
-    [string[]]$Args
+    [string[]]$CliRest = @()
 
 )
 
@@ -43,28 +43,25 @@ $env:GEOSTAT_KIT_ROOT = $PackageRoot
 
 
 function Show-Help {
+    $aliases = Get-CliAliasesFromManifest
+    $aliasLine = '(none)'
+    if ($aliases -and $aliases.Count -gt 0) {
+        $aliasLine = ($aliases.GetEnumerator() | ForEach-Object { "$($_.Key)->$($_.Value)" }) -join ', '
+    }
 
     Write-Host @"
 
-
-
-  geostat — geostat-kit (kits/geostat-kit)
-
-
+  geostat - geostat-kit (kits/geostat-kit)
 
     init | validate | migrate | vscode-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout
 
-    mod <moduleId> deploy|manage|compose|check|modules  …
+    mod <moduleId> deploy|manage|compose|check|modules  ...
 
-    init  — full bootstrap (scaffold + seed secrets + compose-gen)
+    init  - full bootstrap (scaffold + seed secrets + compose-gen)
 
-    Shortcuts (cli.aliases): $(($aliases = Get-CliAliasesFromManifest; ($aliases.GetEnumerator() | ForEach-Object { "$($_.Key)->$($_.Value)" }) -join ', '))
-
-
+    Shortcuts (cli.aliases): $aliasLine
 
   Stack types (drivers/registry.json):
-
-
 
 "@
 
@@ -243,7 +240,7 @@ $globalCommands = @{
         $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
         $env:PYTHONPATH = "$PackageRoot"
         $vargs = @()
-        if ($Args -contains "--force") { $vargs += "--force" }
+        if ($CliRest -contains "--force") { $vargs += "--force" }
         & $py (Join-Path $PackageRoot "lib\vscode_gen.py") @vargs
         exit $LASTEXITCODE
     }
@@ -268,16 +265,23 @@ $globalCommands = @{
 
     "infra" = {
 
-        if (-not (Test-Path $bash)) { Write-Host "Git Bash required"; exit 1 }
-
-        & $bash (Join-Path $PackageRoot "toolkit\infra\ensure-prereqs.sh") @Args
-
+        $infraDriver = Join-Path $PackageRoot "toolkit\infra\Invoke-Infra.ps1"
+        $infraPass = @($CliRest)
+        if ($infraPass.Count -eq 0 -and $infraPass -isnot [string]) {
+            $infraPass = @()
+        }
+        if ($infraPass.Count -gt 0 -and (Test-Path $infraDriver)) {
+            & $infraDriver @infraPass
+            exit $LASTEXITCODE
+        }
+        if (-not (Test-Path $bash)) { Write-Host "Git Bash required for: geostat infra (prereqs)"; exit 1 }
+        & $bash (Join-Path $PackageRoot "toolkit\infra\ensure-prereqs.sh")
         exit $LASTEXITCODE
 
     }
 
     "layout" = {
-        $layoutArgs = [System.Collections.ArrayList]@($Args)
+        $layoutArgs = [System.Collections.ArrayList]@($CliRest)
         $roleFilter = $null
         $modFilter = $null
         $runAll = $false
@@ -348,7 +352,7 @@ if ($globalCommands.ContainsKey($Command)) {
 
 if ($Command -eq "mod") {
 
-    if ($Args.Count -lt 1) {
+    if ($CliRest.Count -lt 1) {
 
         Write-Host "  Usage: geostat mod <moduleId> <deploy|manage|...> [args]" -ForegroundColor Red
 
@@ -356,9 +360,9 @@ if ($Command -eq "mod") {
 
     }
 
-    $moduleId = $Args[0]
+    $moduleId = $CliRest[0]
 
-    $rest = if ($Args.Count -gt 1) { $Args[1..($Args.Count - 1)] } else { @() }
+    $rest = if ($CliRest.Count -gt 1) { $CliRest[1..($CliRest.Count - 1)] } else { @() }
 
     Invoke-ModuleDriver -ModuleId $moduleId -DriverArgs $rest
 
@@ -370,7 +374,7 @@ $aliasTarget = Resolve-CliAlias $Command
 
 if ($aliasTarget) {
 
-    Invoke-ModuleDriver -ModuleId $aliasTarget -DriverArgs $Args
+    Invoke-ModuleDriver -ModuleId $aliasTarget -DriverArgs $CliRest
 
 }
 

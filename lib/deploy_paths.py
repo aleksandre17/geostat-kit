@@ -129,3 +129,41 @@ def infer_server_base_from_ssh(server: str) -> str | None:
         return None
     user = server.split("@", 1)[0]
     return f"/home/{user}"
+
+
+def normalize_infra_slug(slug: str) -> str:
+    s = slug.strip().rstrip("/")
+    return re.sub(r"[^a-z0-9._-]+", "-", s.lower()).strip("-")
+
+
+def resolve_infra_deploy_path(
+    *,
+    deploy_path: str | None,
+    server_base: str | None,
+    global_project: str | None,
+    consumer_slug: str,
+) -> str:
+    """Remote infra root: {server_base}/{global_project}/infra/{consumer_slug}."""
+    slug = normalize_infra_slug(consumer_slug)
+    if not slug:
+        raise ValueError("INFRA_SLUG or consumer repo name required")
+    if deploy_path:
+        base = normalize_base(deploy_path)
+        if not base.endswith(f"/infra/{slug}"):
+            raise ValueError(f"DEPLOY_PATH must end with /infra/{slug}, got: {base}")
+        return base
+    if server_base and global_project:
+        gp = normalize_infra_slug(global_project)
+        return f"{normalize_base(server_base)}/{gp}/infra/{slug}"
+    return f"/home/administrator/geostat/infra/{slug}"
+
+
+def infra_deploy_path_candidates(
+    *, server_base: str, global_project: str, consumer_slug: str
+) -> list[str]:
+    slug = normalize_infra_slug(consumer_slug)
+    gp = normalize_infra_slug(global_project)
+    base = normalize_base(server_base)
+    if not base or not slug:
+        return []
+    return [f"{base}/{gp}/infra/{slug}"]

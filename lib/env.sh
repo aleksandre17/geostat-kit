@@ -143,6 +143,43 @@ geostat_env_value() {
   echo "$default"
 }
 
+geostat_infra_consumer_slug() {
+  local slug
+  slug="$(geostat_env_value infra INFRA_SLUG "")"
+  [[ -n "$slug" ]] || slug="$(basename "$(geostat_monorepo_root)")"
+  geostat_slugify "$slug"
+}
+
+# Remote: {server_base}/{DEPLOY_PROJECT}/infra/{INFRA_SLUG}
+geostat_resolve_infra_deploy_path() {
+  local explicit slug base gp
+  slug="$(geostat_infra_consumer_slug)"
+  explicit="$(geostat_env_value infra DEPLOY_PATH "")"
+  if [[ -n "$explicit" ]]; then
+    explicit="${explicit%/}"
+    if [[ "$explicit" != */infra/"$slug" ]]; then
+      echo "ERROR: DEPLOY_PATH must end with /infra/$slug (got: $explicit)" >&2
+      return 1
+    fi
+    echo "$explicit"
+    return 0
+  fi
+  base="$(geostat_server_base)"
+  gp="$(geostat_project_slug)"
+  if [[ -n "$base" && -n "$gp" ]]; then
+    echo "${base%/}/$gp/infra/$slug"
+    return 0
+  fi
+  echo "/home/administrator/geostat/infra/$slug"
+}
+
+geostat_infra_compose_dir() {
+  local proj rel
+  proj="$(geostat_find_project_root)" || return 1
+  rel="$(geostat_read_manifest_field stack.infraComposeDir "ops/compose/infra")"
+  echo "$proj/$rel"
+}
+
 # geostat_stack_env_files <dev|prod>
 geostat_stack_env_files() {
   local profile="$1" folder seen=()

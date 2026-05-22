@@ -29,3 +29,14 @@ remote_container_name() {
   name="$(_manage_remote_dir "$s")"
   echo "${name:-$s}"
 }
+
+# Remove images tagged for deployed compose services only — not server-wide unused-image prune.
+manage_prune_deployed_images() {
+  local s img_list=""
+  for s in "${SERVICES[@]}"; do
+    img_list="${img_list} ${s}"
+  done
+  img_list="${img_list# }"
+  [ -z "$img_list" ] && return 0
+  ssh "$SERVER" "for name in $img_list; do ids=\$(docker images -q \"\$name\" 2>/dev/null); [ -n \"\$ids\" ] && docker rmi -f \$ids 2>/dev/null || true; done"
+}

@@ -35,6 +35,8 @@ def flatten_defaults() -> dict[str, str]:
         "compose.catalog": read_nested(m, "compose.catalog"),
         "compose.syncModules": read_nested(m, "compose.syncModules"),
         "stack.composeDir": read_nested(m, "stack.composeDir"),
+        "stack.infraComposeDir": read_nested(m, "stack.infraComposeDir"),
+        "stack.networkName": read_nested(m, "stack.networkName"),
     }
     return {k: v for k, v in out.items() if v}
 

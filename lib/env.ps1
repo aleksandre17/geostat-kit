@@ -149,6 +149,31 @@ function Get-DeployServerBase {
     return $null
 }
 
+function Get-InfraConsumerSlug {
+    $s = Get-SecretsEnvValue -Module "infra" -Key "INFRA_SLUG"
+    if ($s) { return (Get-Slugify $s.Trim()) }
+    Get-Slugify (Split-Path (Get-MonorepoRoot) -Leaf)
+}
+
+function Resolve-InfraDeployPath {
+    $explicit = Get-SecretsEnvValue -Module "infra" -Key "DEPLOY_PATH"
+    $slug = Get-InfraConsumerSlug
+    if ($explicit) {
+        $base = $explicit.Trim().TrimEnd('/', '\').Replace("`r", "").Replace("`n", "")
+        if ($base -notmatch "/infra/$([regex]::Escape($slug))$") {
+            throw "DEPLOY_PATH must end with /infra/$slug (got: $base)"
+        }
+        return $base
+    }
+    $serverBase = Get-DeployServerBase
+    $globalRoot = Get-DeployEnvValue "DEPLOY_PROJECT"
+    if (-not $globalRoot) { $globalRoot = Get-ProjectSlug }
+    if ($serverBase -and $globalRoot) {
+        return "$serverBase/$(Get-Slugify $globalRoot)/infra/$slug"
+    }
+    return "/home/administrator/geostat/infra/$slug"
+}
+
 function Get-StackComposeEnvFileArgs {
     param([ValidateSet("dev", "prod")][string]$Environment)
     $args = [System.Collections.ArrayList]@()

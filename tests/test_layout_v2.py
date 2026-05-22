@@ -60,7 +60,7 @@ def _manifest_paths(manifest: dict, repo_root: Path) -> list[tuple[str, Path]]:
     for mid, mod in manifest.get("modules", {}).items():
         out.append((f"modules.{mid}.path", repo_root.joinpath(*mod["path"].split("/"))))
     ci = manifest.get("ci", {})
-    for key in ("integration", "prepareEnv", "waitHealth"):
+    for key in ("integration", "prepareEnv", "waitHealth", "waitStackHealth"):
         if rel := ci.get(key):
             out.append((f"ci.{key}", repo_root.joinpath(*rel.split("/"))))
     adapter_file_keys = frozenset({"template", "output", "env", "envExample", "credentialsFile"})
@@ -216,6 +216,13 @@ class TestComposeCatalogAndStack:
         text = (stack / "docker-compose.yml").read_text(encoding="utf-8")
         assert "apps/backend" in text or "../../apps/backend" in text
         assert "apps/frontend" in text or "../../apps/frontend" in text
+
+    def test_stack_compose_includes_manifest_modules(self, repo_root: Path, manifest: dict) -> None:
+        stack = repo_root.joinpath(*manifest["stack"]["composeDir"].split("/"))
+        text = (stack / "docker-compose.yml").read_text(encoding="utf-8")
+        for mid in ("retrieval", "ingestion"):
+            if mid in (manifest.get("modules") or {}):
+                assert "retrieval-service" in text or "ingestion-service" in text or mid in text
 
 
 class TestCliChain:

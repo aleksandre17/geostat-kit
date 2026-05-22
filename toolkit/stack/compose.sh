@@ -34,12 +34,14 @@ done < <(geostat_stack_env_files "$PROFILE")
 
 cd "$COMPOSE_DIR"
 STACK_NAME="$(geostat_deploy_env_value COMPOSE_PROJECT_NAME "$(basename "$ROOT")")"
-UI_PORT="$(geostat_env_value frontend DEPLOY_HOST_PORT "5177")"
-API_PORT_VAL="$(geostat_env_value backend API_PORT "8090")"
 echo ""
 echo "  $STACK_NAME stack ($PROFILE)"
-echo "  UI  -> http://localhost:${UI_PORT}"
-echo "  API -> http://localhost:${API_PORT_VAL}"
+PY="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
+if [[ -n "$PY" ]]; then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && echo "  $line"
+  done < <("$PY" "$PKG/lib/modules_cli.py" stack-endpoints)
+fi
 echo ""
 
 exec docker compose "${ENV_ARGS[@]}" -f "$COMPOSE_FILE" "${REMAIN[@]}"

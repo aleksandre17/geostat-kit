@@ -1,10 +1,8 @@
 {
-  "description": "Default keys for compose generation and ops scripts. Override in ops/config/deploy.env.",
+  "description": "Deploy.env keys. Compose service names default from geostat.ops.json modules (compose_identity); COMPOSE_*_SERVICE optional legacy overrides.",
   "keys": {
     "DEPLOY_PROJECT": "from_repo_folder",
     "COMPOSE_PROJECT_NAME": "from_repo_folder",
-    "COMPOSE_API_SERVICE": "{slug}-api",
-    "COMPOSE_APP_SERVICE": "{slug}-app",
     "DOCKER_NETWORK": "{slug}-net",
     "API_PORT": "8090",
     "WORKER_PORT": "8091",

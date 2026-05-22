@@ -28,17 +28,14 @@ def test_gcp_optional_by_feature(repo_root: Path, manifest: dict) -> None:
     assert ctx2.gcp_credentials_filename() is None
 
 
-def test_compose_service_names_use_slug_not_brand(repo_root: Path, manifest: dict, tmp_path) -> None:
-    deploy = tmp_path / "deploy.env"
-    deploy.write_text("COMPOSE_API_SERVICE=my-svc-api\n", encoding="utf-8")
+def test_compose_service_names_from_manifest(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
-    # monkeypatch secrets root read via temp - test logic directly
-    names = {
-        "api": "my-svc-api",
-        "app": "test-app-app",
-        "worker": "test-app-worker",
-    }
-    assert "geostat-chat" not in json.dumps(names)
+    names = ctx.compose_service_names()
+    assert names["modules"]["backend"].endswith("-api")
+    assert names["modules"]["retrieval"].endswith("-retrieval")
+    assert names["modules"]["ingestion"].endswith("-ingestion")
+    assert names["worker"] == names["modules"]["ingestion"]
+    assert "geostat-chat-api" not in json.dumps(names)
 
 
 def test_list_secrets_module_folders(repo_root: Path, manifest: dict) -> None:

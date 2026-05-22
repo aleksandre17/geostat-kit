@@ -13,7 +13,8 @@ Unified verbs where possible:
 | `reload` | nginx reload (static dist) | n/a |
 | `config` | show `dist/config.json` on server | n/a |
 | `undeploy` / `rm` | stop + rm container | `compose down` (keep files) |
-| `delete` / `nuke` | stop + rm + delete files | stop + rm + optional wipe |
+| `delete` / `nuke` | stop + rm + delete files | per-service: `compose down -v --rmi local` + wipe deploy dir |
+| `nuke all` | n/a | each deployed service above + **scoped** image removal for those compose service names only (no global `docker image prune`) |
 
 ## Frontend deploy modes on server
 
