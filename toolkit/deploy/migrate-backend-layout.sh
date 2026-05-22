@@ -21,8 +21,10 @@ source "$PKG_ROOT/lib/env.sh"
 GEOSTAT_PROJECT_ROOT="$(geostat_find_project_root "$(pwd)" 2>/dev/null || echo "$(cd "$PKG_ROOT/../../.." && pwd)")"
 export GEOSTAT_PROJECT_ROOT
 
-OPS_SECRETS_MODULE="backend"
-SECRETS_DIR="$(geostat_secrets_module_dir "$OPS_SECRETS_MODULE")"
+OPS_MODULE_ID="$(geostat_module_id_for_type java-boot)"
+[[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="backend"
+OPS_SECRETS_MODULE="$(geostat_secrets_module_name "$OPS_MODULE_ID")"
+SECRETS_DIR="$(geostat_secrets_dir_for_module "$OPS_MODULE_ID")"
 SERVER="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(geostat_deploy_env_value DEPLOY_SERVER "")")"
 PROJECT="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PROJECT "")"
 [[ -n "$PROJECT" ]] || PROJECT="$(geostat_project_slug)"

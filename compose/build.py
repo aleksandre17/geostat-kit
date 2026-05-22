@@ -28,17 +28,24 @@ DEPLOY_KEYS = (
 
 
 def find_project_root() -> Path:
+    from lib.manifest_defaults import legacy_root_discovery_enabled
+
     if os.environ.get("GEOSTAT_PROJECT_ROOT"):
         return Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
     start = Path.cwd().resolve()
     for p in [start, *start.parents]:
         if (p / "geostat.ops.json").is_file():
             return p
-        if ((p / "ops" / "config").is_dir() or (p / "secrets").is_dir()) and (
-            (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir()
-        ):
-            return p
-    raise SystemExit("ERROR: project root not found (geostat.ops.json or ops/config/)")
+    if legacy_root_discovery_enabled():
+        for p in [start, *start.parents]:
+            if ((p / "ops" / "config").is_dir() or (p / "secrets").is_dir()) and (
+                (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir()
+            ):
+                return p
+    raise SystemExit(
+        "ERROR: project root not found (geostat.ops.json required; "
+        "GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for pre-v2 trees)"
+    )
 
 
 def load_manifest(root: Path) -> dict:
@@ -77,7 +84,9 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 def load_deploy_overrides(root: Path) -> dict[str, str]:
-    secrets = root / load_manifest(root).get("secrets", "ops/config")
+    from lib.manifest_defaults import default_field
+
+    secrets = root / load_manifest(root).get("secrets") or default_field("secrets") or "ops/config"
     deploy = parse_env_file(secrets / "deploy.env")
     for key in DEPLOY_KEYS:
         if key in os.environ and os.environ[key]:

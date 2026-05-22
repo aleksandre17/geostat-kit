@@ -8,14 +8,24 @@
 
 Everything resolves through **`geostat.ops.json`** at the **consumer project root**.
 
+## Convention defaults (single source)
+
+**`scaffold/geostat.ops.json`** is the only inline convention catalog. Runtime code reads defaults via:
+
+- Python: `lib/manifest_defaults.py` → `default_field()`, `flatten_defaults()`
+- PowerShell: `Get-ScaffoldManifestField` / `Get-ManifestField` (implicit scaffold default)
+- Bash: `geostat_read_manifest_field` with empty default → Python `default_field`
+
+No duplicate `DEFAULTS = {...}` dicts in package code.
+
 ## Layers
 
 ```text
 ┌─────────────────────────────────────────┐
 │  geostat-kit (this package)             │
 │  lib/project_context.py  ← single API   │
-│  lib/project.sh / env.sh                │
-│  drivers · toolkit · compose engine     │
+│  lib/project.sh / env.sh / project.ps1    │
+│  drivers · toolkit · compose engine       │
 └──────────────────┬──────────────────────┘
                    │ reads
 ┌──────────────────▼──────────────────────┐
@@ -35,49 +45,64 @@ Everything resolves through **`geostat.ops.json`** at the **consumer project roo
 | `stack.composeDir` | Generated full-stack YAML |
 | `modules.<id>.path` | App code directory |
 | `modules.<id>.secretsModule` | Subdir under `secrets` for env files |
+| `modules.<id>.type` | Driver id (`java-boot`, `node-vite`, …) |
+| `cli.aliases` | Shortcut → `modules.<id>` (e.g. `fe` → `frontend`) |
 
 ## Optional (features / adapters)
 
 | Field | Purpose |
 |-------|---------|
 | `features.gcpCredentials` | If `true`, CI may seed `adapters.gcp.credentialsFile` |
-| `adapters.gcp.credentialsFile` | Filename under backend secrets module (default `google-credentials.json`) |
-
-Projects without GCP set `features.gcpCredentials: false` (scaffold default).
+| `adapters.gcp.credentialsFile` | Filename under backend secrets module |
 
 ## Resolution API
 
-**Python** (CI, compose-gen, tests):
+**Python:**
 
 ```python
 from lib.project_context import ProjectContext
 ctx = ProjectContext.discover()
-ctx.secrets_module_dir("backend")
-ctx.module_path("frontend")
-ctx.feature_enabled("gcpCredentials")
+ctx.secrets_module_dir("backend")  # module id, not folder name
+ctx.module_id_for_type("node-vite")
+ctx.resolve_alias("fe")
 ```
 
-**Bash**:
+**Bash:**
 
 ```bash
-source "$PKG/lib/project.sh"
 geostat_secrets_dir_for_module backend
-geostat_module_path frontend
-geostat_stack_compose_dir
+geostat_module_id_for_type node-vite
+geostat_default_remote_deploy_base "$(geostat_secrets_module_name backend)"
 ```
+
+**PowerShell:**
+
+```powershell
+Get-ManifestModulePath (Get-ModuleIdByDriverType node-vite)
+Get-DefaultRemoteDeployPathBase -SecretsFolder (Get-ModuleSecretsFolder frontend)
+Resolve-CliAlias fe
+```
+
+## Project root discovery
+
+1. **`GEOSTAT_PROJECT_ROOT`** env
+2. Walk up for **`geostat.ops.json`** (required in normal use)
+3. Legacy (opt-in): **`GEOSTAT_LEGACY_ROOT_DISCOVERY=1`** — `ops/config` or `secrets/` + `kits|packages/geostat-kit`
 
 ## CI & init seed
 
-`ci/prepare-integration-env.sh` and `geostat init` (bash fallback) → `lib/ci_prepare.py` — loops `manifest.modules`, seeds `.example` → working copies; GCP file **only** if `features.gcpCredentials`.
+`ci/prepare-integration-env.sh` and `geostat init` → **`lib/ci_prepare.py`** — loops `manifest.modules`.
 
 ## Remote deploy path fallback
 
-When `DEPLOY_PATH` is unset: `{DEPLOY_SERVER_BASE}/{DEPLOY_PROJECT}/{secretsModule}/` via `geostat_default_remote_deploy_base` / `Get-DefaultRemoteDeployPathBase` (uses manifest `modules.*.secretsModule`, not hardcoded `frontend`/`backend` folder names).
+`DEPLOY_PATH` unset → `{DEPLOY_SERVER_BASE}/{DEPLOY_PROJECT}/{secretsModule}/` using manifest folder names.
 
-## Compose catalog
+## Module dispatch
 
-Service **names** and **paths** come from project `catalog.json` + `deploy.env` (`COMPOSE_*`), not from the package. Package templates use placeholders `{api_service}`, `{secrets_backend}`, etc.
+- CLI: `geostat fe` / `geostat be` → `cli.aliases` in manifest (scaffold defaults if missing)
+- Drivers: `modules.<id>.type` → `drivers/registry.json`
+- Layout: `--frontend` → first `node-vite` module; `--backend` → first `java-boot`; `--module <id>`
 
 ## Tests
 
-Package tests use abstract names (`test-app-api`, `/home/example/...`) — never consumer project brands.
+Package tests use abstract names — never consumer project brands. `test_manifest_defaults.py` locks scaffold as default source.

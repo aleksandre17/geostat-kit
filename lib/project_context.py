@@ -7,22 +7,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULTS = {
-    "package": "kits/geostat-kit",
-    "secrets": "ops/config",
-    "compose.catalog": "ops/compose/catalog.json",
-    "compose.syncModules": "apps/backend/ops.modules",
-    "stack.composeDir": "ops/compose/stack",
-}
+from lib.manifest_defaults import (
+    default_field,
+    legacy_root_discovery_enabled,
+    load_scaffold_manifest,
+    module_by_type,
+    module_ids,
+    read_nested,
+    resolve_cli_alias,
+)
 
 
 def _read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
-    cur: Any = data
-    for key in dotted.split("."):
-        if not isinstance(cur, dict) or key not in cur:
-            return default
-        cur = cur[key]
-    return str(cur) if cur is not None else default
+    return read_nested(data, dotted, default)
 
 
 def find_project_root(start: Path | None = None) -> Path:
@@ -32,10 +29,15 @@ def find_project_root(start: Path | None = None) -> Path:
     for p in [start, *start.parents]:
         if (p / "geostat.ops.json").is_file():
             return p
-        if (p / "ops" / "config").is_dir() or (p / "secrets").is_dir():
-            if (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir():
-                return p
-    raise FileNotFoundError("project root not found (geostat.ops.json or ops/config/)")
+    if legacy_root_discovery_enabled():
+        for p in [start, *start.parents]:
+            if (p / "ops" / "config").is_dir() or (p / "secrets").is_dir():
+                if (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir():
+                    return p
+    raise FileNotFoundError(
+        "project root not found (geostat.ops.json required; "
+        "set GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for pre-v2 trees)"
+    )
 
 
 def load_manifest(root: Path) -> dict[str, Any]:
@@ -55,9 +57,22 @@ class ProjectContext:
         root = find_project_root(start)
         return cls(root=root, manifest=load_manifest(root))
 
+    @classmethod
+    def scaffold_defaults(cls) -> dict[str, Any]:
+        return load_scaffold_manifest()
+
     def field(self, dotted: str, default: str | None = None) -> str:
-        d = default if default is not None else DEFAULTS.get(dotted, "")
+        d = default if default is not None else default_field(dotted)
         return _read_nested(self.manifest, dotted, d)
+
+    def resolve_alias(self, alias: str) -> str | None:
+        return resolve_cli_alias(alias, self.manifest)
+
+    def module_id_for_type(self, driver_type: str) -> str | None:
+        return module_by_type(self.manifest, driver_type)
+
+    def list_module_ids(self) -> list[str]:
+        return module_ids(self.manifest)
 
     @property
     def secrets_root(self) -> Path:
@@ -76,6 +91,10 @@ class ProjectContext:
     def secrets_module_dir(self, module_id: str) -> Path:
         sm = _read_nested(self.manifest, f"modules.{module_id}.secretsModule", module_id)
         return self.secrets_root / sm
+
+    def secrets_folder_path(self, secrets_folder: str) -> Path:
+        """Path under secrets root by folder name (modules.*.secretsModule)."""
+        return self.secrets_root / secrets_folder
 
     def secrets_module_dirs(self) -> dict[str, Path]:
         mods = self.manifest.get("modules") or {}
@@ -102,19 +121,21 @@ class ProjectContext:
         return False
 
     def gcp_credentials_filename(self) -> str | None:
-        """Optional backend secret file; only when feature + adapter configured."""
         if not self.feature_enabled("gcpCredentials"):
             return None
         gcp = (self.manifest.get("adapters") or {}).get("gcp") or {}
         if isinstance(gcp, dict) and gcp.get("enabled") is False:
             return None
-        fn = "google-credentials.json"
+        fn = _read_nested(
+            self.manifest,
+            "adapters.gcp.credentialsFile",
+            _read_nested(load_scaffold_manifest(), "adapters.gcp.credentialsFile", "google-credentials.json"),
+        )
         if isinstance(gcp, dict) and gcp.get("credentialsFile"):
             fn = str(gcp["credentialsFile"])
         return fn
 
     def secrets_module_folder(self, module_id: str) -> str:
-        """Subdir under secrets root (manifest modules.<id>.secretsModule)."""
         cfg = (self.manifest.get("modules") or {}).get(module_id)
         if isinstance(cfg, dict) and cfg.get("secretsModule"):
             return str(cfg["secretsModule"])
@@ -123,7 +144,6 @@ class ProjectContext:
     def default_remote_deploy_base(
         self, secrets_folder: str, *, server_base: str = "", project_slug: str = ""
     ) -> str:
-        """Fallback DEPLOY_PATH when unset: {server_base}/{slug}/{secrets_folder}."""
         slug = project_slug or self.root.name
         deploy = self.secrets_root / "deploy.env"
         if deploy.is_file():
@@ -149,7 +169,6 @@ class ProjectContext:
         return out
 
     def compose_service_names(self) -> dict[str, str]:
-        """Logical roles → container/service names from deploy.env contract (not brands)."""
         deploy = self.secrets_root / "deploy.env"
         env: dict[str, str] = {}
         if deploy.is_file():

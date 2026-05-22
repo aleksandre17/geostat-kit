@@ -90,8 +90,15 @@ function Get-CliAliasesFromManifest {
         }
         return $aliases
     }
-    if ($data.modules.PSObject.Properties["frontend"]) { $aliases["fe"] = "frontend" }
-    if ($data.modules.PSObject.Properties["backend"]) { $aliases["be"] = "backend" }
+    $scaffold = Get-ScaffoldManifestPath
+    if (Test-Path $scaffold) {
+        $s = Get-Content $scaffold -Raw | ConvertFrom-Json
+        if ($s.cli -and $s.cli.aliases) {
+            $s.cli.aliases.PSObject.Properties | ForEach-Object {
+                $aliases[$_.Name] = [string]$_.Value
+            }
+        }
+    }
     return $aliases
 }
 

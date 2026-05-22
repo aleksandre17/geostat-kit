@@ -18,29 +18,31 @@ function Get-MonorepoRoot {
     if (-not $dir) { $dir = Split-Path -Parent $MyInvocation.MyCommand.Path }
     while ($dir) {
         if (Test-Path (Join-Path $dir "geostat.ops.json")) { return $dir }
-        if (Test-Path (Join-Path $dir "secrets")) { return $dir }
-        if (Test-Path (Join-Path $dir "ops/config")) { return $dir }
+        if ($env:GEOSTAT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
+            if (Test-Path (Join-Path $dir "secrets")) { return $dir }
+            if (Test-Path (Join-Path $dir "ops/config")) { return $dir }
+        }
         $parent = Split-Path $dir -Parent
         if ($parent -eq $dir) { break }
         $dir = $parent
     }
-    throw "Project root not found (geostat.ops.json or ops/config/)"
+    throw "Project root not found (geostat.ops.json required; GEOSTAT_LEGACY_ROOT_DISCOVERY=1 for old trees)"
 }
 
 function Get-SecretsRoot {
     $root = Get-MonorepoRoot
-    $rel = Get-ManifestField "secrets" "secrets"
+    $rel = Get-ManifestField "secrets"
     Join-Path $root ($rel -replace '/', '\')
 }
 
 function Get-SecretsModuleDir {
-    param([ValidateSet("frontend", "backend")][string]$Module)
+    param([Parameter(Mandatory = $true)][string]$Module)
     Join-Path (Get-SecretsRoot) $Module
 }
 
 function Get-SecretsEnvFiles {
     param(
-        [ValidateSet("frontend", "backend")][string]$Module,
+        [Parameter(Mandatory = $true)][string]$Module,
         [ValidateSet("dev", "prod", "deploy", "all")][string]$Profile = "all"
     )
     $dir = Get-SecretsModuleDir $Module
@@ -132,13 +134,16 @@ function Get-DockerNetworkName {
 function Get-DeployServerBase {
     $base = Get-DeployEnvValue "DEPLOY_SERVER_BASE"
     if ($base) { return $base }
-    foreach ($module in @("frontend", "backend")) {
-        $base = Get-SecretsEnvValue -Module $module -Key "DEPLOY_SERVER_BASE"
+    foreach ($folder in (Get-ListedSecretsModuleFolders)) {
+        $base = Get-SecretsEnvValue -Module $folder -Key "DEPLOY_SERVER_BASE"
         if ($base) { return $base }
     }
     $server = Get-DeployEnvValue "DEPLOY_SERVER"
     if (-not $server) {
-        $server = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_SERVER"
+        foreach ($folder in (Get-ListedSecretsModuleFolders)) {
+            $server = Get-SecretsEnvValue -Module $folder -Key "DEPLOY_SERVER"
+            if ($server) { break }
+        }
     }
     if ($server -match '^([^@]+)@') { return "/home/$($Matches[1])" }
     return $null
@@ -148,8 +153,8 @@ function Get-StackComposeEnvFileArgs {
     param([ValidateSet("dev", "prod")][string]$Environment)
     $args = [System.Collections.ArrayList]@()
     $seen = @{}
-    foreach ($module in @("backend", "frontend")) {
-        foreach ($f in (Get-SecretsEnvFiles -Module $module -Profile $Environment)) {
+    foreach ($folder in (Get-ListedSecretsModuleFolders)) {
+        foreach ($f in (Get-SecretsEnvFiles -Module $folder -Profile $Environment)) {
             if ($seen[$f]) { continue }
             $seen[$f] = $true
             [void]$args.Add("--env-file")

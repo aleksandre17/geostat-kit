@@ -9,13 +9,23 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
+$script:FeModuleId = Get-ModuleIdByDriverType "node-vite"
+$script:BeModuleId = Get-ModuleIdByDriverType "java-boot"
+$script:FeSecretsFolder = if ($script:FeModuleId) { Get-ModuleSecretsFolder $script:FeModuleId } else { $null }
+$script:BeSecretsFolder = if ($script:BeModuleId) { Get-ModuleSecretsFolder $script:BeModuleId } else { $null }
 
 function Get-DeployMeta {
-    $server = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_SERVER"
-    if (-not $server) { $server = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_SERVER" }
+    $server = $null
+    foreach ($folder in (Get-ListedSecretsModuleFolders)) {
+        $server = Get-SecretsEnvValue -Module $folder -Key "DEPLOY_SERVER"
+        if ($server) { break }
+    }
     if (-not $server) { $server = Get-DeployEnvValue "DEPLOY_SERVER" }
-    $project = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_PROJECT"
-    if (-not $project) { $project = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_PROJECT" }
+    $project = $null
+    foreach ($folder in (Get-ListedSecretsModuleFolders)) {
+        $project = Get-SecretsEnvValue -Module $folder -Key "DEPLOY_PROJECT"
+        if ($project) { break }
+    }
     if (-not $project) { $project = Get-ProjectSlug }
     $base = Get-DeployServerBase
     [PSCustomObject]@{ Server = $server; Project = $project; ServerBase = $base; Network = (Get-DockerNetworkName) }
@@ -66,14 +76,18 @@ function Format-Tree {
 }
 
 $meta = Get-DeployMeta
-$feSeg = (Split-Path (Get-SecretsModuleDir "frontend") -Leaf)
-$beSeg = (Split-Path (Get-SecretsModuleDir "backend") -Leaf)
-$feDeployBase = Get-SecretsEnvValue -Module $feSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $feSeg)
-$beDeployBase = Get-SecretsEnvValue -Module $beSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $beSeg)
-$beLayout = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_LAYOUT" -Default "structured"
+$feDeployBase = if ($script:FeSecretsFolder) {
+    Get-SecretsEnvValue -Module $script:FeSecretsFolder -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $script:FeSecretsFolder)
+} else { $null }
+$beDeployBase = if ($script:BeSecretsFolder) {
+    Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $script:BeSecretsFolder)
+} else { $null }
+$beLayout = if ($script:BeSecretsFolder) {
+    Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_LAYOUT" -Default "structured"
+} else { "structured" }
 
-$beRoot = Get-ManifestModulePath "backend"
-$feRoot = Get-ManifestModulePath "frontend"
+$beRoot = if ($script:BeModuleId) { Get-ManifestModulePath $script:BeModuleId } else { $null }
+$feRoot = if ($script:FeModuleId) { Get-ManifestModulePath $script:FeModuleId } else { $null }
 $beDevSvc = Get-ComposeServices (Join-Path $beRoot "docker-compose.dev.yml")
 $beProdSvc = Get-ComposeServices (Join-Path $beRoot "docker-compose.prod.yml")
 $feSvc = Get-ComposeServices (Join-Path $feRoot "docker-compose.yml")

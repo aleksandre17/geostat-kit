@@ -237,9 +237,10 @@ class TestKitPackageIntegrity:
         assert "geostat.ops.json" in build_py
         assert "kits" in build_py or "ops/config" in build_py
 
-    def test_project_sh_defaults_ops_compose_catalog(self, pkg_root: Path) -> None:
+    def test_project_sh_defaults_from_scaffold(self, pkg_root: Path) -> None:
         text = (pkg_root / "lib" / "project.sh").read_text(encoding="utf-8")
-        assert "ops/compose/catalog.json" in text
+        assert "manifest_defaults" in text or "default_field" in text
+        assert "GEOSTAT_LEGACY_ROOT_DISCOVERY" in text
 
     def test_scaffold_v2_tree(self, pkg_root: Path) -> None:
         sc = pkg_root / "scaffold"

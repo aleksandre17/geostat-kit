@@ -13,17 +13,19 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
+$script:BeModuleId = Get-ModuleIdByDriverType "java-boot"
+if (-not $script:BeModuleId) { throw "manifest: no module with type java-boot" }
+$script:BeSecretsFolder = Get-ModuleSecretsFolder $script:BeModuleId
 
 function Get-BeMeta {
-    $server = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_SERVER"
+    $server = Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_SERVER"
     if (-not $server) { $server = Get-DeployEnvValue "DEPLOY_SERVER" }
-    $project = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_PROJECT"
+    $project = Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_PROJECT"
     if (-not $project) { $project = Get-DeployEnvValue "DEPLOY_PROJECT" }
     if (-not $project) { $project = Get-ProjectSlug }
     $base = Get-DeployServerBase
-    $beSeg = (Split-Path (Get-SecretsModuleDir "backend") -Leaf)
-    $deployPath = Get-SecretsEnvValue -Module $beSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $beSeg)
-    $layout = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_LAYOUT" -Default "flat"
+    $deployPath = Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $script:BeSecretsFolder)
+    $layout = Get-SecretsEnvValue -Module $script:BeSecretsFolder -Key "DEPLOY_LAYOUT" -Default "flat"
     [PSCustomObject]@{
         Server     = $server
         Project    = $project
@@ -82,7 +84,7 @@ function Format-TreeLines {
 }
 
 $meta = Get-BeMeta
-$beRoot = Get-ManifestModulePath "backend"
+$beRoot = Get-ManifestModulePath $script:BeModuleId
 $beDev = Get-ComposeServices (Join-Path $beRoot "docker-compose.dev.yml")
 $beProd = Get-ComposeServices (Join-Path $beRoot "docker-compose.prod.yml")
 $api = $beProd | Where-Object { $_.Service -match "api" } | Select-Object -First 1

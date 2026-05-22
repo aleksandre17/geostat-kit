@@ -17,6 +17,10 @@ _geostat_manifest_file() {
   echo "$root/geostat.ops.json"
 }
 
+_geostat_legacy_discovery() {
+  [[ "${GEOSTAT_LEGACY_ROOT_DISCOVERY:-}" =~ ^(1|true|yes|on)$ ]]
+}
+
 geostat_find_project_root() {
   if [[ -n "${GEOSTAT_PROJECT_ROOT:-}" ]]; then
     echo "$GEOSTAT_PROJECT_ROOT"
@@ -28,17 +32,32 @@ geostat_find_project_root() {
       echo "$dir"
       return 0
     fi
-    if [[ -d "$dir/secrets" ]] || [[ -d "$dir/ops/config" ]]; then
-      echo "$dir"
-      return 0
-    fi
     dir="$(dirname "$dir")"
   done
+  if _geostat_legacy_discovery; then
+    dir="${1:-$(pwd)}"
+    while [[ -n "$dir" && "$dir" != "/" ]]; do
+      if [[ -d "$dir/secrets" || -d "$dir/ops/config" ]]; then
+        if [[ -d "$dir/kits/geostat-kit" || -d "$dir/packages/geostat-kit" ]]; then
+          echo "$dir"
+          return 0
+        fi
+      fi
+      dir="$(dirname "$dir")"
+    done
+  fi
   return 1
 }
 
 geostat_read_manifest_field() {
   local field="$1" default="${2:-}"
+  if [[ -z "$default" && -n "${GEOSTAT_KIT_ROOT:-}" ]]; then
+    default="$(PYTHONPATH="${GEOSTAT_KIT_ROOT}${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from lib.manifest_defaults import default_field
+import sys
+print(default_field(sys.argv[1]))
+" "$field" 2>/dev/null || true)"
+  fi
   local mf root
   mf="$(_geostat_manifest_file 2>/dev/null)" || { echo "$default"; return; }
   root="$(dirname "$mf")"
@@ -71,7 +90,7 @@ geostat_kit_package_root() {
   fi
   local proj rel pkg
   proj="$(geostat_find_project_root)" || return 1
-  rel="$(geostat_read_manifest_field package "kits/geostat-kit")"
+  rel="$(geostat_read_manifest_field package)"
   pkg="$(cd "$proj" && cd "$rel" 2>/dev/null && pwd)"
   echo "$pkg"
 }
@@ -87,13 +106,13 @@ geostat_kit_deploy_lib() {
 geostat_kit_compose_catalog() {
   local proj
   proj="$(geostat_find_project_root)" || return 1
-  echo "$proj/$(geostat_read_manifest_field compose.catalog ops/compose/catalog.json)"
+  echo "$proj/$(geostat_read_manifest_field compose.catalog)"
 }
 
 geostat_kit_sync_modules_path() {
   local proj
   proj="$(geostat_find_project_root)" || return 1
-  echo "$proj/$(geostat_read_manifest_field compose.syncModules apps/backend/ops.modules)"
+  echo "$proj/$(geostat_read_manifest_field compose.syncModules)"
 }
 
 # --- Module / secrets paths (manifest modules.*) ---
@@ -120,7 +139,7 @@ geostat_secrets_dir_for_module() {
 geostat_stack_compose_dir() {
   local proj rel
   proj="$(geostat_find_project_root)" || return 1
-  rel="$(geostat_read_manifest_field stack.composeDir ops/compose/stack)"
+  rel="$(geostat_read_manifest_field stack.composeDir)"
   echo "$proj/$rel"
 }
 
@@ -136,6 +155,19 @@ print('true' if f is True else 'false')
 }
 
 # Secrets folder names from manifest modules (one per line)
+geostat_module_id_for_type() {
+  local driver_type="$1" mf
+  mf="$(_geostat_manifest_file 2>/dev/null)" || return 1
+  python3 -c "
+import json, sys
+m = json.load(open(sys.argv[1], encoding='utf-8'))
+for mid, cfg in (m.get('modules') or {}).items():
+    if isinstance(cfg, dict) and cfg.get('type') == sys.argv[2]:
+        print(mid)
+        break
+" "$mf" "$driver_type" 2>/dev/null
+}
+
 geostat_list_secrets_module_folders() {
   local mf
   mf="$(_geostat_manifest_file 2>/dev/null)" || return 0

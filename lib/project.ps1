@@ -20,18 +20,44 @@ function Get-ProjectRootFromManifest {
     if ($env:GEOSTAT_PROJECT_ROOT) { return $env:GEOSTAT_PROJECT_ROOT }
     $mf = Get-ProjectManifestPath
     if ($mf) { return Split-Path $mf -Parent }
-    $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-    while ($dir) {
-        if ((Test-Path (Join-Path $dir "ops\config")) -or (Test-Path (Join-Path $dir "secrets"))) { return $dir }
-        $parent = Split-Path $dir -Parent
-        if ($parent -eq $dir) { break }
-        $dir = $parent
+    if ($env:GEOSTAT_LEGACY_ROOT_DISCOVERY -match '^(1|true|yes|on)$') {
+        $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+        while ($dir) {
+            if ((Test-Path (Join-Path $dir "ops\config")) -or (Test-Path (Join-Path $dir "secrets"))) { return $dir }
+            $parent = Split-Path $dir -Parent
+            if ($parent -eq $dir) { break }
+            $dir = $parent
+        }
     }
     return $null
 }
 
+function Get-ScaffoldManifestPath {
+    if ($env:GEOSTAT_KIT_ROOT) {
+        return Join-Path $env:GEOSTAT_KIT_ROOT "scaffold\geostat.ops.json"
+    }
+    Join-Path (Get-OpsPackageRoot) "scaffold\geostat.ops.json"
+}
+
+function Get-ScaffoldManifestField {
+    param([string]$Field)
+    $path = Get-ScaffoldManifestPath
+    if (-not (Test-Path $path)) { return "" }
+    $m = Get-Content $path -Raw | ConvertFrom-Json
+    $v = $m
+    foreach ($p in ($Field -split '\.')) {
+        if ($null -eq $v) { return "" }
+        $prop = $v.PSObject.Properties[$p]
+        if (-not $prop) { return "" }
+        $v = $prop.Value
+    }
+    if ($null -eq $v) { return "" }
+    return [string]$v
+}
+
 function Get-ManifestField {
-    param([string]$Field, [string]$Default = "")
+    param([string]$Field, [string]$Default = $null)
+    if ($null -eq $Default) { $Default = Get-ScaffoldManifestField $Field }
     $mf = Get-ProjectManifestPath
     if (-not $mf -or -not (Test-Path $mf)) { return $Default }
     $m = Get-Content $mf -Raw | ConvertFrom-Json
@@ -49,7 +75,7 @@ function Get-ManifestField {
 function Get-OpsPackageRoot {
     if ($env:OPS_PACKAGE_ROOT) { return $env:OPS_PACKAGE_ROOT }
     $proj = Get-ProjectRootFromManifest
-    $rel = Get-ManifestField "package" "kits/geostat-kit"
+    $rel = Get-ManifestField "package"
     return (Resolve-Path (Join-Path $proj $rel)).Path
 }
 
@@ -58,17 +84,57 @@ function Get-OpsToolkitPowerShellRoot {
 }
 
 function Get-ManifestModulePath {
-    param([ValidateSet("frontend", "backend")][string]$ModuleId)
+    param([Parameter(Mandatory = $true)][string]$ModuleId)
     $proj = Get-ProjectRootFromManifest
     if (-not $proj) { throw "geostat.ops.json not found" }
-    $rel = Get-ManifestField "modules.$ModuleId.path" "apps/$ModuleId"
+    $rel = Get-ManifestField "modules.$ModuleId.path"
+    if (-not $rel) { throw "manifest modules.$ModuleId.path missing" }
     Join-Path $proj ($rel -replace '/', '\')
+}
+
+function Get-ModuleSecretsFolder {
+    param([Parameter(Mandatory = $true)][string]$ModuleId)
+    $sm = Get-ManifestField "modules.$ModuleId.secretsModule"
+    if (-not $sm) { $sm = $ModuleId }
+    return $sm
+}
+
+function Get-ModuleIdByDriverType {
+    param([Parameter(Mandatory = $true)][string]$DriverType)
+    $mf = Get-ProjectManifestPath
+    if (-not $mf) { return $null }
+    $data = Get-Content $mf -Raw | ConvertFrom-Json
+    foreach ($p in $data.modules.PSObject.Properties) {
+        if ($p.Value.type -eq $DriverType) { return [string]$p.Name }
+    }
+    return $null
+}
+
+function Get-ListedSecretsModuleFolders {
+    $mf = Get-ProjectManifestPath
+    if (-not $mf) {
+        return @(
+            (Get-ScaffoldManifestField "modules.frontend.secretsModule"),
+            (Get-ScaffoldManifestField "modules.backend.secretsModule")
+        ) | Where-Object { $_ }
+    }
+    $data = Get-Content $mf -Raw | ConvertFrom-Json
+    $seen = @{}
+    $out = [System.Collections.ArrayList]@()
+    foreach ($p in $data.modules.PSObject.Properties) {
+        $folder = if ($p.Value.secretsModule) { [string]$p.Value.secretsModule } else { [string]$p.Name }
+        if (-not $seen[$folder]) {
+            $seen[$folder] = $true
+            [void]$out.Add($folder)
+        }
+    }
+    return $out.ToArray()
 }
 
 function Get-StackComposeDirFromManifest {
     $proj = Get-ProjectRootFromManifest
     if (-not $proj) { throw "geostat.ops.json not found" }
-    $rel = Get-ManifestField "stack.composeDir" "ops/compose/stack"
+    $rel = Get-ManifestField "stack.composeDir"
     Join-Path $proj ($rel -replace '/', '\')
 }
 

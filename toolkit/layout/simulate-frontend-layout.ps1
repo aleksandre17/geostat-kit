@@ -13,16 +13,19 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\env.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
+$script:FeModuleId = Get-ModuleIdByDriverType "node-vite"
+if (-not $script:FeModuleId) { throw "manifest: no module with type node-vite" }
+$script:FeSecretsFolder = Get-ModuleSecretsFolder $script:FeModuleId
 
 function Get-DeployMeta {
-    $server = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_SERVER"
+    $server = Get-SecretsEnvValue -Module $script:FeSecretsFolder -Key "DEPLOY_SERVER"
     if (-not $server) { $server = Get-DeployEnvValue "DEPLOY_SERVER" }
-    $project = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_PROJECT"
+    $project = Get-SecretsEnvValue -Module $script:FeSecretsFolder -Key "DEPLOY_PROJECT"
     if (-not $project) { $project = Get-DeployEnvValue "DEPLOY_PROJECT" }
     if (-not $project) { $project = Get-ProjectSlug }
     $base = Get-DeployServerBase
-    $feDeployFromSecrets = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_PATH"
-    $hostPort = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_HOST_PORT" -Default "5177"
+    $feDeployFromSecrets = Get-SecretsEnvValue -Module $script:FeSecretsFolder -Key "DEPLOY_PATH"
+    $hostPort = Get-SecretsEnvValue -Module $script:FeSecretsFolder -Key "DEPLOY_HOST_PORT" -Default "5177"
     [PSCustomObject]@{
         Server           = $server
         Project          = $project
@@ -63,7 +66,7 @@ function Get-ComposeServicesFromYaml {
 
 function Get-SimEnvValue {
     param([string]$Key, [string]$Default = "")
-    $fe = Get-SecretsModuleDir "frontend"
+    $fe = Get-SecretsModuleDir $script:FeSecretsFolder
     foreach ($name in @(".env.deploy", ".env.dev", ".env.prod")) {
         $p = Join-Path $fe $name
         if (-not (Test-Path $p)) { continue }
@@ -78,7 +81,7 @@ function Get-SimEnvValue {
 function Resolve-RemoteDeployPath {
     param([string]$ContainerName, [object]$Meta, [string]$Kind = "static")
     $base = $Meta.DeployPathSecret
-    if (-not $base) { $base = Get-DefaultRemoteDeployPathBase -SecretsFolder (Get-SecretsModuleDir "frontend" | Split-Path -Leaf) }
+    if (-not $base) { $base = Get-DefaultRemoteDeployPathBase -SecretsFolder $script:FeSecretsFolder }
     $base = $base.Trim().TrimEnd('/')
     $layout = Get-SimEnvValue "DEPLOY_LAYOUT" "structured"
     if ($layout -eq "structured") {
@@ -213,9 +216,10 @@ function Get-ServerStagingTree {
 }
 
 $meta = Get-DeployMeta
-$feRoot = Get-ManifestModulePath "frontend"
-$beRoot = Get-ManifestModulePath "backend"
-$feRel = (Get-ManifestField "modules.frontend.path" "apps/frontend") -replace '\\', '/'
+$feRoot = Get-ManifestModulePath $script:FeModuleId
+$beModId = Get-ModuleIdByDriverType "java-boot"
+$beRoot = if ($beModId) { Get-ManifestModulePath $beModId } else { $null }
+$feRel = (Get-ManifestField "modules.$($script:FeModuleId).path") -replace '\\', '/'
 $svc = Get-ComposeServicesFromYaml (Join-Path $feRoot "docker-compose.yml")
 if ($svc.Count -eq 0) {
     $svc = @([PSCustomObject]@{ Name = "app"; ContainerName = (Get-ComposeAppServiceName); Dockerfile = "src/Dockerfile"; Context = "." })
@@ -229,7 +233,7 @@ $localLogs = Join-Path $feRoot "logs"
 $stagingDir = "$($meta.ServerBase)/$($meta.Project)/deploy-staging"
 $legacyFlat = "$($meta.DeployPathSecret)/$container"
 if (-not $meta.DeployPathSecret) {
-    $feSeg = (Split-Path (Get-SecretsModuleDir "frontend") -Leaf)
+    $feSeg = $script:FeSecretsFolder
     $legacyFlat = "$($meta.ServerBase)/$($meta.Project)/$feSeg/$container"
 }
 
@@ -343,11 +347,13 @@ $scenarios["A4-local-stack"] = [PSCustomObject]@{
             (New-TreeNode "docker-compose.yml" -Note "build context from manifest modules"),
             (New-TreeNode "docker-compose.prod.yml")
         )),
-        (New-TreeNode (Get-ManifestField "modules.backend.path" "apps/backend") @(
-            (New-TreeNode "docker-compose.dev.yml"),
-            (New-TreeNode "src/..."),
-            (New-TreeNode "build/libs/*.jar")
-        )),
+        $(if ($beModId) {
+            New-TreeNode (Get-ManifestField "modules.$beModId.path") @(
+                (New-TreeNode "docker-compose.dev.yml"),
+                (New-TreeNode "src/..."),
+                (New-TreeNode "build/libs/*.jar")
+            )
+        }),
         (Get-RepoFrontendSourceTree -FeRoot $feRoot)
     )
     DockerStart = @(

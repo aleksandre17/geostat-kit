@@ -57,7 +57,7 @@ function Show-Help {
 
     init  — full bootstrap (scaffold + seed secrets + compose-gen)
 
-    fe|be  shortcuts (cli.aliases in geostat.ops.json)
+    Shortcuts (cli.aliases): $(($aliases = Get-CliAliasesFromManifest; ($aliases.GetEnumerator() | ForEach-Object { "$($_.Key)->$($_.Value)" }) -join ', '))
 
 
 
@@ -242,16 +242,34 @@ $globalCommands = @{
     }
 
     "layout" = {
-        $layoutArgs = @($Args)
-        $feOnly = $layoutArgs -contains "--frontend" -or $layoutArgs -contains "-Frontend"
-        $beOnly = $layoutArgs -contains "--backend" -or $layoutArgs -contains "-Backend"
-        $layoutArgs = $layoutArgs | Where-Object { $_ -notin @("--frontend", "-Frontend", "--backend", "-Backend") }
-        if (-not $beOnly) {
+        $layoutArgs = [System.Collections.ArrayList]@($Args)
+        $feOnly = $false
+        $beOnly = $false
+        $modFilter = $null
+        $strip = @("--frontend", "-Frontend", "--backend", "-Backend", "--module", "-Module")
+        $i = 0
+        while ($i -lt $layoutArgs.Count) {
+            $a = [string]$layoutArgs[$i]
+            if ($a -in @("--frontend", "-Frontend")) { $feOnly = $true; $layoutArgs.RemoveAt($i); continue }
+            if ($a -in @("--backend", "-Backend")) { $beOnly = $true; $layoutArgs.RemoveAt($i); continue }
+            if ($a -in @("--module", "-Module") -and ($i + 1) -lt $layoutArgs.Count) {
+                $modFilter = [string]$layoutArgs[$i + 1]
+                $layoutArgs.RemoveAt($i + 1)
+                $layoutArgs.RemoveAt($i)
+                continue
+            }
+            $i++
+        }
+        $feMod = Get-ModuleIdByDriverType "node-vite"
+        $beMod = Get-ModuleIdByDriverType "java-boot"
+        $runFe = (-not $beOnly) -and (-not $modFilter -or $modFilter -eq $feMod)
+        $runBe = (-not $feOnly) -and (-not $modFilter -or $modFilter -eq $beMod)
+        if ($runFe -and $feMod) {
             & (Join-Path $PackageRoot "toolkit\layout\simulate-frontend-layout.ps1") @layoutArgs
         }
-        if (-not $feOnly) {
+        if ($runBe -and $beMod) {
             & (Join-Path $PackageRoot "toolkit\layout\simulate-backend-layout.ps1") @layoutArgs
-            if (-not $beOnly) {
+            if (-not $feOnly -and -not $modFilter) {
                 & (Join-Path $PackageRoot "toolkit\layout\simulate-server-layout.ps1") @layoutArgs
             }
         }
