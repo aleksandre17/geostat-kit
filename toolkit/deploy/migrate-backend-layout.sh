@@ -21,8 +21,9 @@ source "$PKG_ROOT/lib/env.sh"
 GEOSTAT_PROJECT_ROOT="$(geostat_find_project_root "$(pwd)" 2>/dev/null || echo "$(cd "$PKG_ROOT/../../.." && pwd)")"
 export GEOSTAT_PROJECT_ROOT
 
-OPS_MODULE_ID="$(geostat_module_id_for_type java-boot)"
-[[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="backend"
+OPS_MODULE_ID="$(geostat_module_id_for_role api)"
+[[ -n "$OPS_MODULE_ID" ]] || OPS_MODULE_ID="$(geostat_module_id_for_type java-boot)"
+[[ -n "$OPS_MODULE_ID" ]] || { echo "  ERROR: no api/java-boot module in geostat.ops.json" >&2; exit 1; }
 OPS_SECRETS_MODULE="$(geostat_secrets_module_name "$OPS_MODULE_ID")"
 SECRETS_DIR="$(geostat_secrets_dir_for_module "$OPS_MODULE_ID")"
 SERVER="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(geostat_deploy_env_value DEPLOY_SERVER "")")"

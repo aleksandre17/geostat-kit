@@ -155,6 +155,30 @@ print('true' if f is True else 'false')
 }
 
 # Secrets folder names from manifest modules (one per line)
+geostat_module_id_for_role() {
+  local role="$1" idx="${2:-0}" mf mid
+  mf="$(_geostat_manifest_file 2>/dev/null)" || return 1
+  mapfile -t _GEOSTAT_ROLE_IDS < <(python3 -c "
+import json, sys
+m = json.load(open(sys.argv[1], encoding='utf-8'))
+role = sys.argv[2]
+out = []
+for mid, cfg in (m.get('modules') or {}).items():
+    if not isinstance(cfg, dict):
+        continue
+    r = (cfg.get('role') or '').lower()
+    if not r and cfg.get('type') == 'node-vite':
+        r = 'ui'
+    if not r and cfg.get('type') == 'java-boot':
+        r = 'api'
+    if r == role:
+        out.append(mid)
+print('\n'.join(out))
+" "$mf" "$role" 2>/dev/null)
+  mid="${_GEOSTAT_ROLE_IDS[$idx]:-}"
+  [[ -n "$mid" ]] && echo "$mid"
+}
+
 geostat_module_id_for_type() {
   local driver_type="$1" mf
   mf="$(_geostat_manifest_file 2>/dev/null)" || return 1

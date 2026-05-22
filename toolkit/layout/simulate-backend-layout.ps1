@@ -2,6 +2,7 @@
 # Usage: geostat layout --backend  |  -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md
 
 param(
+    [string]$ModuleId = "",
     [switch]$Json,
     [switch]$Markdown,
     [string]$OutFile = ""
@@ -11,10 +12,14 @@ $ErrorActionPreference = "Stop"
 $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\env.ps1")
+. (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$script:BeModuleId = Get-ModuleIdByDriverType "java-boot"
-if (-not $script:BeModuleId) { throw "manifest: no module with type java-boot" }
+$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "api" }
+if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
+if (-not $ModuleId) { throw "manifest: no api / java-boot module" }
+$script:BeModuleId = $ModuleId
 $script:BeSecretsFolder = Get-ModuleSecretsFolder $script:BeModuleId
 
 function Get-BeMeta {

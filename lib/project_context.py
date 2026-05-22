@@ -11,10 +11,19 @@ from lib.manifest_defaults import (
     default_field,
     legacy_root_discovery_enabled,
     load_scaffold_manifest,
-    module_by_type,
-    module_ids,
     read_nested,
     resolve_cli_alias,
+)
+from lib.modules import (
+    default_stack_deploy_steps,
+    infer_cli_aliases,
+    layout_simulator_for_type,
+    module_by_role,
+    module_by_type,
+    module_ids,
+    modules_by_role,
+    modules_by_type,
+    module_role,
 )
 
 
@@ -68,11 +77,33 @@ class ProjectContext:
     def resolve_alias(self, alias: str) -> str | None:
         return resolve_cli_alias(alias, self.manifest)
 
-    def module_id_for_type(self, driver_type: str) -> str | None:
-        return module_by_type(self.manifest, driver_type)
+    def cli_aliases(self) -> dict[str, str]:
+        return infer_cli_aliases(self.manifest)
+
+    def module_id_for_role(self, role: str, index: int = 0) -> str | None:
+        return module_by_role(self.manifest, role, index)
+
+    def module_ids_for_role(self, role: str) -> list[str]:
+        return modules_by_role(self.manifest, role)
+
+    def module_id_for_type(self, driver_type: str, index: int = 0) -> str | None:
+        return module_by_type(self.manifest, driver_type, index)
+
+    def module_ids_for_type(self, driver_type: str) -> list[str]:
+        return modules_by_type(self.manifest, driver_type)
+
+    def get_module_role(self, module_id: str) -> str:
+        return module_role(self.manifest, module_id)
 
     def list_module_ids(self) -> list[str]:
         return module_ids(self.manifest)
+
+    def stack_deploy_steps_default(self) -> list[dict[str, Any]]:
+        return default_stack_deploy_steps(self.manifest)
+
+    def layout_simulator_script(self, module_id: str) -> str | None:
+        typ = _read_nested(self.manifest, f"modules.{module_id}.type", "")
+        return layout_simulator_for_type(typ) if typ else None
 
     @property
     def secrets_root(self) -> Path:

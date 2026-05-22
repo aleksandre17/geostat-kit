@@ -91,43 +91,21 @@ def command_path(root: Path, pkg: Path, manifest: dict[str, Any], registry: dict
 
 
 def cli_aliases(manifest: dict[str, Any]) -> dict[str, str]:
-    custom = manifest.get("cli", {}).get("aliases", {})
-    if custom:
-        return {str(k): str(v) for k, v in custom.items()}
-    # sensible defaults only when those module ids exist
-    defaults: dict[str, str] = {}
-    mods = manifest.get("modules", {})
-    if "frontend" in mods:
-        defaults["fe"] = "frontend"
-    if "backend" in mods:
-        defaults["be"] = "backend"
-    return defaults
+    from lib.modules import infer_cli_aliases
+
+    return infer_cli_aliases(manifest)
 
 
 def resolve_alias(manifest: dict[str, Any], alias: str) -> str | None:
-    aliases = cli_aliases(manifest)
-    if alias in aliases:
-        return aliases[alias]
-    if alias in manifest.get("modules", {}):
-        return alias
-    return None
+    from lib.modules import resolve_cli_alias as _resolve
+
+    return _resolve(alias, manifest)
 
 
 def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    """Backward-compatible plan when stackDeploy is omitted."""
-    mods = manifest.get("modules", {})
-    steps: list[dict[str, Any]] = []
-    if "backend" in mods:
-        steps.append({"module": "backend", "command": "deploy", "args": ["all"]})
-    if "frontend" in mods:
-        steps.append(
-            {
-                "module": "frontend",
-                "command": "deploy",
-                "args": ["dist", "-Environment", "{environment}"],
-            }
-        )
-    return steps
+    from lib.modules import default_stack_deploy_steps as _default
+
+    return _default(manifest)
 
 
 def stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:

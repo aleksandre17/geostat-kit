@@ -27,12 +27,14 @@
   },
   "modules": {
     "backend": {
+      "role": "api",
       "type": "java-boot",
       "path": "apps/backend",
       "secretsModule": "backend",
       "target": "backend"
     },
     "frontend": {
+      "role": "ui",
       "type": "node-vite",
       "path": "apps/frontend",
       "secretsModule": "frontend",

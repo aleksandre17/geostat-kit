@@ -43,9 +43,13 @@ def prepare(ctx: ProjectContext) -> None:
     gcp_fn = ctx.gcp_credentials_filename()
     if gcp_fn:
         backend_dirs: list[Path] = []
-        for mid, cfg in (ctx.manifest.get("modules") or {}).items():
-            if isinstance(cfg, dict) and cfg.get("type") == "java-boot":
-                backend_dirs.append(ctx.secrets_module_dir(mid))
+        from lib.modules import modules_by_role
+
+        for role in ("api", "worker"):
+            for mid in modules_by_role(ctx.manifest, role):
+                cfg = (ctx.manifest.get("modules") or {}).get(mid) or {}
+                if isinstance(cfg, dict) and cfg.get("type") == "java-boot":
+                    backend_dirs.append(ctx.secrets_module_dir(mid))
         for bdir in backend_dirs:
             cred = bdir / gcp_fn
             if not cred.is_file():

@@ -44,27 +44,17 @@ def default_field(dotted: str) -> str:
 
 
 def cli_aliases(manifest: dict[str, Any] | None = None) -> dict[str, str]:
+    from lib.modules import infer_cli_aliases
+
     m = manifest if manifest is not None else load_scaffold_manifest()
-    aliases = (m.get("cli") or {}).get("aliases") or {}
-    if isinstance(aliases, dict) and aliases:
-        return {str(k): str(v) for k, v in aliases.items()}
-    mods = m.get("modules") or {}
-    out: dict[str, str] = {}
-    if "frontend" in mods:
-        out["fe"] = "frontend"
-    if "backend" in mods:
-        out["be"] = "backend"
-    return out
+    return infer_cli_aliases(m)
 
 
 def resolve_cli_alias(alias: str, manifest: dict[str, Any] | None = None) -> str | None:
+    from lib.modules import resolve_cli_alias as _resolve
+
     m = manifest if manifest is not None else load_scaffold_manifest()
-    aliases = cli_aliases(m)
-    if alias in aliases:
-        return aliases[alias]
-    if alias in (m.get("modules") or {}):
-        return alias
-    return None
+    return _resolve(alias, m)
 
 
 def module_ids(manifest: dict[str, Any]) -> list[str]:
@@ -72,10 +62,9 @@ def module_ids(manifest: dict[str, Any]) -> list[str]:
 
 
 def module_by_type(manifest: dict[str, Any], driver_type: str) -> str | None:
-    for mid, cfg in (manifest.get("modules") or {}).items():
-        if isinstance(cfg, dict) and cfg.get("type") == driver_type:
-            return str(mid)
-    return None
+    from lib.modules import module_by_type as _one
+
+    return _one(manifest, driver_type, 0)
 
 
 def legacy_root_discovery_enabled() -> bool:

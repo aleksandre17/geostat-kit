@@ -2,6 +2,7 @@
 # Usage: geostat layout --frontend  |  simulate-frontend-layout.ps1 [-Json] [-Markdown]
 
 param(
+    [string]$ModuleId = "",
     [switch]$Json,
     [switch]$Markdown,
     [string]$OutFile = ""
@@ -11,10 +12,14 @@ $ErrorActionPreference = "Stop"
 $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\env.ps1")
+. (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$script:FeModuleId = Get-ModuleIdByDriverType "node-vite"
-if (-not $script:FeModuleId) { throw "manifest: no module with type node-vite" }
+$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+if (-not $ModuleId) { $ModuleId = Get-ModuleIdByRole "ui" }
+if (-not $ModuleId) { $ModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
+if (-not $ModuleId) { throw "manifest: no ui / node-vite module" }
+$script:FeModuleId = $ModuleId
 $script:FeSecretsFolder = Get-ModuleSecretsFolder $script:FeModuleId
 
 function Get-DeployMeta {
@@ -217,7 +222,8 @@ function Get-ServerStagingTree {
 
 $meta = Get-DeployMeta
 $feRoot = Get-ManifestModulePath $script:FeModuleId
-$beModId = Get-ModuleIdByDriverType "java-boot"
+$beModId = Get-ModuleIdByRole "api"
+if (-not $beModId) { $beModId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
 $beRoot = if ($beModId) { Get-ManifestModulePath $beModId } else { $null }
 $feRel = (Get-ManifestField "modules.$($script:FeModuleId).path") -replace '\\', '/'
 $svc = Get-ComposeServicesFromYaml (Join-Path $feRoot "docker-compose.yml")

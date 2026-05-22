@@ -59,11 +59,16 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["type", "path", "secretsModule"],
+        "required": ["type", "path", "secretsModule", "role"],
         "properties": {
           "type": {
             "type": "string",
             "description": "Driver id from drivers/registry.json (e.g. java-boot, node-vite)"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["ui", "api", "worker", "gateway", "data", "other"],
+            "description": "Logical role for stack order, layout, and default CLI shortcuts"
           },
           "path": { "type": "string" },
           "secretsModule": { "type": "string" },

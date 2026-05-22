@@ -97,11 +97,36 @@ Resolve-CliAlias fe
 
 `DEPLOY_PATH` unset → `{DEPLOY_SERVER_BASE}/{DEPLOY_PROJECT}/{secretsModule}/` using manifest folder names.
 
-## Module dispatch
+## N-module model (multi-tenant package)
 
-- CLI: `geostat fe` / `geostat be` → `cli.aliases` in manifest (scaffold defaults if missing)
-- Drivers: `modules.<id>.type` → `drivers/registry.json`
-- Layout: `--frontend` → first `node-vite` module; `--backend` → first `java-boot`; `--module <id>`
+Any number of modules in `geostat.ops.json`:
+
+| Field | Purpose |
+|-------|---------|
+| `modules.<id>.role` | `ui`, `api`, `worker`, `gateway`, `data`, `other` — stack order, layout, shortcuts |
+| `modules.<id>.type` | Driver: `node-vite`, `java-boot`, … (`drivers/registry.json` + `roles`) |
+| `modules.<id>.path` | App source tree |
+| `modules.<id>.secretsModule` | Subdir under `secrets` |
+
+**CLI**
+
+- `geostat mod <moduleId> deploy …` — canonical
+- `cli.aliases` — e.g. `fe` → `frontend` (consumer-defined)
+- Auto shortcuts when one module per role: `ui`, `api`, `worker` → that module id
+
+**Layout**
+
+```bash
+geostat layout --all              # every module + server overview
+geostat layout --role api         # all api-role modules
+geostat layout --module web       # one module
+```
+
+Deprecated: `--frontend` / `--backend` → use `--role ui` / `--role api`.
+
+**Stack deploy** (`stackDeploy.steps` or default): `api` / `worker` modules first, then `ui`.
+
+**Code:** `lib/modules.py`, `lib/modules.ps1`, `lib/modules_cli.py`
 
 ## Tests
 

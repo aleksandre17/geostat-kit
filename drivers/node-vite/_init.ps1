@@ -1,5 +1,7 @@
 # node-vite driver init — set $env:GEOSTAT_MODULE_ID before dot-sourcing
-if (-not $env:GEOSTAT_MODULE_ID) { $env:GEOSTAT_MODULE_ID = "frontend" }
+if (-not $env:GEOSTAT_MODULE_ID) {
+    throw "GEOSTAT_MODULE_ID required — run: geostat mod <moduleId> <command> (see geostat help)"
+}
 
 $DriverRoot = Split-Path $PSScriptRoot -Parent
 $PackageRoot = Split-Path $DriverRoot -Parent

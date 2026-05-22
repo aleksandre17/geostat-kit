@@ -24,6 +24,7 @@ if ($Command -eq "init") {
 . (Join-Path $PackageRoot "lib\project.ps1")
 
 . (Join-Path $PackageRoot "lib\drivers.ps1")
+. (Join-Path $PackageRoot "lib\modules.ps1")
 
 $Root = Get-ProjectRootFromManifest
 
@@ -81,8 +82,19 @@ function Show-Help {
 
         $caps = (Get-DriverCapabilities $mid) -join ", "
 
-        Write-Host "    $mid  type=$typ  [$caps]"
+        $role = (Get-ModuleRole $mid)
 
+        Write-Host "    $mid  role=$role  type=$typ  [$caps]"
+
+    }
+
+    $aliasMap = Get-CliAliasesFromManifest
+    if ($aliasMap.Count -gt 0) {
+        Write-Host ""
+        Write-Host "  CLI aliases:"
+        foreach ($k in ($aliasMap.Keys | Sort-Object)) {
+            Write-Host "    $k -> $($aliasMap[$k])"
+        }
     }
 
     Write-Host ""
@@ -243,35 +255,56 @@ $globalCommands = @{
 
     "layout" = {
         $layoutArgs = [System.Collections.ArrayList]@($Args)
-        $feOnly = $false
-        $beOnly = $false
+        $roleFilter = $null
         $modFilter = $null
-        $strip = @("--frontend", "-Frontend", "--backend", "-Backend", "--module", "-Module")
+        $runAll = $false
+        $runServer = $true
         $i = 0
         while ($i -lt $layoutArgs.Count) {
             $a = [string]$layoutArgs[$i]
-            if ($a -in @("--frontend", "-Frontend")) { $feOnly = $true; $layoutArgs.RemoveAt($i); continue }
-            if ($a -in @("--backend", "-Backend")) { $beOnly = $true; $layoutArgs.RemoveAt($i); continue }
+            if ($a -in @("--all")) { $runAll = $true; $layoutArgs.RemoveAt($i); continue }
+            if ($a -in @("--no-server")) { $runServer = $false; $layoutArgs.RemoveAt($i); continue }
+            if ($a -in @("--frontend", "-Frontend")) {
+                Write-Host "  [warn] --frontend deprecated; use --role ui" -ForegroundColor Yellow
+                $roleFilter = "ui"; $layoutArgs.RemoveAt($i); continue
+            }
+            if ($a -in @("--backend", "-Backend")) {
+                Write-Host "  [warn] --backend deprecated; use --role api" -ForegroundColor Yellow
+                $roleFilter = "api"; $layoutArgs.RemoveAt($i); continue
+            }
+            if ($a -in @("--role", "-Role") -and ($i + 1) -lt $layoutArgs.Count) {
+                $roleFilter = [string]$layoutArgs[$i + 1]
+                $layoutArgs.RemoveAt($i + 1); $layoutArgs.RemoveAt($i); continue
+            }
             if ($a -in @("--module", "-Module") -and ($i + 1) -lt $layoutArgs.Count) {
                 $modFilter = [string]$layoutArgs[$i + 1]
-                $layoutArgs.RemoveAt($i + 1)
-                $layoutArgs.RemoveAt($i)
-                continue
+                $layoutArgs.RemoveAt($i + 1); $layoutArgs.RemoveAt($i); continue
             }
             $i++
         }
-        $feMod = Get-ModuleIdByDriverType "node-vite"
-        $beMod = Get-ModuleIdByDriverType "java-boot"
-        $runFe = (-not $beOnly) -and (-not $modFilter -or $modFilter -eq $feMod)
-        $runBe = (-not $feOnly) -and (-not $modFilter -or $modFilter -eq $beMod)
-        if ($runFe -and $feMod) {
-            & (Join-Path $PackageRoot "toolkit\layout\simulate-frontend-layout.ps1") @layoutArgs
-        }
-        if ($runBe -and $beMod) {
-            & (Join-Path $PackageRoot "toolkit\layout\simulate-backend-layout.ps1") @layoutArgs
-            if (-not $feOnly -and -not $modFilter) {
-                & (Join-Path $PackageRoot "toolkit\layout\simulate-server-layout.ps1") @layoutArgs
+        $targets = [System.Collections.ArrayList]@()
+        if ($modFilter) {
+            if (-not (Get-ModuleManifestEntry $modFilter)) {
+                Write-Host "  Unknown module: $modFilter" -ForegroundColor Red; exit 1
             }
+            [void]$targets.Add($modFilter)
+        } elseif ($roleFilter) {
+            foreach ($mid in (Get-ModuleIdsByRole $roleFilter)) { [void]$targets.Add($mid) }
+            if ($targets.Count -eq 0) {
+                Write-Host "  No modules with role=$roleFilter" -ForegroundColor Red; exit 1
+            }
+        } elseif ($runAll) {
+            foreach ($mid in (Get-ProjectModules)) { [void]$targets.Add($mid) }
+        } else {
+            foreach ($mid in (Get-ProjectModules)) { [void]$targets.Add($mid) }
+        }
+        foreach ($mid in $targets) {
+            Write-Host ""
+            Write-Host "  === layout: module $mid (role $(Get-ModuleRole $mid), type $(Get-ModuleType $mid)) ===" -ForegroundColor Cyan
+            Invoke-ModuleLayoutSimulator -ModuleId $mid @layoutArgs
+        }
+        if ($runServer -and -not $modFilter -and -not $roleFilter) {
+            & (Join-Path $PackageRoot "toolkit\layout\simulate-server-layout.ps1") @layoutArgs
         }
         exit $LASTEXITCODE
     }

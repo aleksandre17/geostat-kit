@@ -81,7 +81,7 @@ function Get-SecretsEnvValue {
 
 function Get-ComposeEnvFileArgs {
     param(
-        [ValidateSet("frontend", "backend")][string]$Module,
+        [Parameter(Mandatory = $true)][string]$Module,
         [ValidateSet("dev", "prod")][string]$Environment
     )
     $args = [System.Collections.ArrayList]@()

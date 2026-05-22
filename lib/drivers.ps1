@@ -88,15 +88,23 @@ function Get-CliAliasesFromManifest {
         $data.cli.aliases.PSObject.Properties | ForEach-Object {
             $aliases[$_.Name] = [string]$_.Value
         }
-        return $aliases
     }
-    $scaffold = Get-ScaffoldManifestPath
-    if (Test-Path $scaffold) {
-        $s = Get-Content $scaffold -Raw | ConvertFrom-Json
-        if ($s.cli -and $s.cli.aliases) {
-            $s.cli.aliases.PSObject.Properties | ForEach-Object {
-                $aliases[$_.Name] = [string]$_.Value
-            }
+    $used = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($v in $aliases.Values) { [void]$used.Add($v) }
+    foreach ($role in @("ui", "api", "worker", "gateway")) {
+        $ids = @(
+            $data.modules.PSObject.Properties |
+                Where-Object {
+                    $r = $_.Value.role
+                    if (-not $r -and $_.Value.type -eq "node-vite") { $r = "ui" }
+                    if (-not $r -and $_.Value.type -eq "java-boot") { $r = "api" }
+                    $r -eq $role
+                } |
+                ForEach-Object { $_.Name }
+        )
+        if ($ids.Count -eq 1 -and -not $used.Contains($ids[0])) {
+            if (-not $aliases.ContainsKey($role)) { $aliases[$role] = $ids[0] }
+            [void]$used.Add($ids[0])
         }
     }
     return $aliases
