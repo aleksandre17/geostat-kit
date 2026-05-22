@@ -96,7 +96,7 @@ geostat_server_base() {
 geostat_secrets_root() {
   local root rel
   root="$(geostat_monorepo_root)"
-  rel="$(geostat_read_manifest_field secrets "secrets")"
+  rel="$(geostat_read_manifest_field secrets "ops/config")"
   echo "$root/$rel"
 }
 
@@ -145,9 +145,11 @@ geostat_env_value() {
 
 # geostat_stack_env_files <dev|prod>
 geostat_stack_env_files() {
-  local profile="$1"
-  geostat_env_files backend "$profile"
-  geostat_env_files frontend "$profile"
+  local profile="$1" folder seen=()
+  while IFS= read -r folder; do
+    [[ -n "$folder" ]] || continue
+    geostat_env_files "$folder" "$profile"
+  done < <(geostat_list_secrets_module_folders)
   local deploy_env
   deploy_env="$(geostat_secrets_root)/deploy.env"
   [[ -f "$deploy_env" ]] && echo "$deploy_env"

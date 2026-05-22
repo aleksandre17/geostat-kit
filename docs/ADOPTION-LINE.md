@@ -333,15 +333,15 @@ HEALTH_RETRIES=24
 ### `ops.modules` (პროექტის registry, sync compose-gen-ით)
 
 ```
-geostat-chat-bot-api=geostat-chat-bot:api
-geostat-chat-bot-worker=geostat-chat-bot:worker
+your-app-api=your-app:api
+your-app-worker=your-app:worker
 ```
 
 ### ოპერაციები
 
 ```powershell
 .\tools\geostat.ps1 be compose up --build
-.\tools\geostat.ps1 be deploy geostat-chat-bot-api --prod
+.\tools\geostat.ps1 be deploy your-app-api --prod
 .\tools\geostat.ps1 be deploy all --prod
 .\tools\geostat.ps1 be manage api status --prod
 .\tools\geostat.ps1 be modules

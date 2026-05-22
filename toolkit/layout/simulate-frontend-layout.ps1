@@ -63,7 +63,7 @@ function Get-ComposeServicesFromYaml {
 
 function Get-SimEnvValue {
     param([string]$Key, [string]$Default = "")
-    $fe = Join-Path $RepoRoot "secrets\frontend"
+    $fe = Get-SecretsModuleDir "frontend"
     foreach ($name in @(".env.deploy", ".env.dev", ".env.prod")) {
         $p = Join-Path $fe $name
         if (-not (Test-Path $p)) { continue }
@@ -78,7 +78,7 @@ function Get-SimEnvValue {
 function Resolve-RemoteDeployPath {
     param([string]$ContainerName, [object]$Meta, [string]$Kind = "static")
     $base = $Meta.DeployPathSecret
-    if (-not $base) { $base = "$($Meta.ServerBase)/$($Meta.Project)/frontend" }
+    if (-not $base) { $base = Get-DefaultRemoteDeployPathBase -SecretsFolder (Get-SecretsModuleDir "frontend" | Split-Path -Leaf) }
     $base = $base.Trim().TrimEnd('/')
     $layout = Get-SimEnvValue "DEPLOY_LAYOUT" "structured"
     if ($layout -eq "structured") {
@@ -213,21 +213,24 @@ function Get-ServerStagingTree {
 }
 
 $meta = Get-DeployMeta
-$feRoot = Join-Path $RepoRoot "frontend"
+$feRoot = Get-ManifestModulePath "frontend"
+$beRoot = Get-ManifestModulePath "backend"
+$feRel = (Get-ManifestField "modules.frontend.path" "apps/frontend") -replace '\\', '/'
 $svc = Get-ComposeServicesFromYaml (Join-Path $feRoot "docker-compose.yml")
 if ($svc.Count -eq 0) {
-    $svc = @([PSCustomObject]@{ Name = "app"; ContainerName = "$(Get-ProjectSlug)-app"; Dockerfile = "src/Dockerfile"; Context = "." })
+    $svc = @([PSCustomObject]@{ Name = "app"; ContainerName = (Get-ComposeAppServiceName); Dockerfile = "src/Dockerfile"; Context = "." })
 }
 $container = $svc[0].ContainerName
 $remoteStatic = Resolve-RemoteDeployPath -ContainerName $container -Meta $meta -Kind "static"
 $remoteComposeDev = Resolve-RemoteDeployPath -ContainerName $container -Meta $meta -Kind "compose-dev"
 $remoteComposeProd = Resolve-RemoteDeployPath -ContainerName $container -Meta $meta -Kind "compose-prod"
-$stackDir = Join-Path $RepoRoot "deploy\compose"
+$stackDir = Get-StackComposeDirFromManifest
 $localLogs = Join-Path $feRoot "logs"
 $stagingDir = "$($meta.ServerBase)/$($meta.Project)/deploy-staging"
 $legacyFlat = "$($meta.DeployPathSecret)/$container"
 if (-not $meta.DeployPathSecret) {
-    $legacyFlat = "$($meta.ServerBase)/$($meta.Project)/frontend/$container"
+    $feSeg = (Split-Path (Get-SecretsModuleDir "frontend") -Leaf)
+    $legacyFlat = "$($meta.ServerBase)/$($meta.Project)/$feSeg/$container"
 }
 
 $scenarios = [ordered]@{}
@@ -237,7 +240,7 @@ $scenarios["A1-local-npm"] = [PSCustomObject]@{
     Id = "A1"
     Group = "Local (developer machine)"
     Title = "Vite dev server (host, no Docker)"
-    Command = "cd frontend && npm run dev"
+    Command = "cd $feRel && npm run dev"
     Host = "(localhost)"
     Root = $feRoot
     EnvFiles = @("ops/config/frontend/.env.dev")
@@ -268,12 +271,12 @@ $scenarios["A2-local-compose-dev"] = [PSCustomObject]@{
     Host = "(localhost)"
     Root = $feRoot
     EnvFiles = @("ops/config/frontend/.env.dev", "ops/config/deploy.env")
-    Docker = "image geostat-chat-bot-app, target development, -p ${DEPLOY_HOST_PORT}:5177"
+    Docker = "image $container, target development, -p ${DEPLOY_HOST_PORT}:5177"
     Runtime = "Vite in container; compose develop.watch on ./src"
     Tree = New-TreeNode $feRoot @(
         (Get-RepoFrontendSourceTree -FeRoot $feRoot),
         (New-TreeNode "(Docker)" @(
-            (New-TreeNode "container: geostat-chat-bot-app"),
+            (New-TreeNode "container: $container"),
             (New-TreeNode "mount: $feRoot -> /app"),
             (New-TreeNode "mount: anonymous /app/node_modules"),
             (New-TreeNode "CMD: npm run dev -- --host 0.0.0.0")
@@ -328,28 +331,28 @@ $scenarios["A3-local-compose-prod"] = [PSCustomObject]@{
 $scenarios["A4-local-stack"] = [PSCustomObject]@{
     Id = "A4"
     Group = "Local (developer machine)"
-    Title = "Full stack - API + UI (deploy/compose)"
+    Title = "Full stack - API + UI (stack compose)"
     Command = ".\tools\geostat.ps1 stack up -d --build"
     Host = "(localhost)"
     Root = $stackDir
     EnvFiles = @("ops/config/frontend/.env.dev", "ops/config/backend/.env.dev", "ops/config/deploy.env")
-    Docker = "deploy/compose/docker-compose.yml + network geostat-net"
+    Docker = "ops/compose/stack/docker-compose.yml + manifest network"
     Runtime = "UI depends_on API health"
     Tree = New-TreeNode $RepoRoot @(
-        (New-TreeNode "deploy/compose/" @(
-            (New-TreeNode "docker-compose.yml" -Note "build context ../../backend, ../../frontend"),
+        (New-TreeNode (Get-ManifestField "stack.composeDir" "ops/compose/stack") @(
+            (New-TreeNode "docker-compose.yml" -Note "build context from manifest modules"),
             (New-TreeNode "docker-compose.prod.yml")
         )),
-        (New-TreeNode "backend/" @(
+        (New-TreeNode (Get-ManifestField "modules.backend.path" "apps/backend") @(
             (New-TreeNode "docker-compose.dev.yml"),
             (New-TreeNode "src/..."),
             (New-TreeNode "build/libs/*.jar")
         )),
-        (Get-RepoFrontendSourceTree -FeRoot (Join-Path $RepoRoot "frontend"))
+        (Get-RepoFrontendSourceTree -FeRoot $feRoot)
     )
     DockerStart = @(
         "1. geostat stack up -d --build",
-        "2. Backend container(s) + frontend geostat-chat-bot-app on shared network"
+        "2. Backend container(s) + frontend $container on shared network"
     )
     DockerUpdate = @(
         "Module rebuild via compose; not SSH module paths"
@@ -367,7 +370,7 @@ $scenarios["A5-local-deploy-local"] = [PSCustomObject]@{
     Root = $feRoot
     EnvFiles = @("ops/config/frontend/.env.{profile}", "VITE_API_URL, DEPLOY_HOST_PORT")
     Docker = "docker build --target production; docker run -p HOST_PORT:80"
-    Runtime = "Container name = folder leaf (frontend) - not geostat-chat-bot-app"
+    Runtime = "Container name = module folder leaf — may differ from compose service ($container)"
     Tree = New-TreeNode "(local Docker only)" @(
         (New-TreeNode "image: frontend" -Note "tag from folder name"),
         (New-TreeNode "container: frontend"),
@@ -384,7 +387,7 @@ $scenarios["A5-local-deploy-local"] = [PSCustomObject]@{
     DockerUpdate = @(
         "Re-run deploy local → stop/rm, rebuild image, run again"
     )
-    Gaps = @("Container name differs from compose (geostat-chat-bot-app).")
+    Gaps = @("Container name differs from compose ($container).")
     Senior = @("Rare; use A2 or B1 instead.")
 }
 
@@ -398,12 +401,12 @@ $scenarios["B1-server-dist"] = [PSCustomObject]@{
     Root = $remoteStatic
     EnvFiles = @("ops/config/frontend/.env.{profile}", ".env.deploy", "server: .env.runtime.json")
     Docker = "nginx:1.27-alpine; volumes dist + nginx.conf; -p HOST_PORT:80"
-    Runtime = "Static SPA; container geostat-chat-bot-app"
+    Runtime = "Static SPA; container $container"
     Tree = New-TreeNode $meta.Server @(
         (Get-ServerStagingTree -StagingDir $stagingDir -ArchiveName "(none for dist)"),
         (Get-ServerStaticTree -RemoteRoot $remoteStatic),
         (New-TreeNode "(Docker)" @(
-            (New-TreeNode "container: geostat-chat-bot-app"),
+            (New-TreeNode "container: $container"),
             (New-TreeNode "volume: $remoteStatic/dist -> /usr/share/nginx/html:ro"),
             (New-TreeNode "volume: $remoteStatic/nginx.conf -> /etc/nginx/conf.d/default.conf:ro")
         ))
@@ -412,7 +415,7 @@ $scenarios["B1-server-dist"] = [PSCustomObject]@{
         "1. Windows: npm run build or build:dev (profile)",
         "2. Write frontend/dist/config.json",
         "3. scp -r dist/ + nginx.conf + .env.runtime.json -> $remoteStatic/",
-        "4. ssh: docker stop/rm geostat-chat-bot-app; docker run -d -p 5177:80 -v .../dist -v .../nginx.conf nginx:1.27-alpine"
+        "4. ssh: docker stop/rm $container; docker run -d -p 5177:80 -v .../dist -v .../nginx.conf nginx:1.27-alpine"
     )
     DockerUpdate = @(
         "Full redeploy dist → rebuild npm, re-scp entire dist/, recreate container"
@@ -436,7 +439,7 @@ $scenarios["B2-server-sync"] = [PSCustomObject]@{
     DockerUpdate = @(
         "1. Windows: npm build (profile)",
         "2. scp dist/, nginx.conf, .env.runtime.json",
-        "3. ssh: docker exec geostat-chat-bot-app nginx -s reload || docker restart"
+        "3. ssh: docker exec $container nginx -s reload || docker restart"
     )
     Gaps = @()
     Senior = @("Quick prod-like UI patch without recreating container.")
@@ -505,7 +508,7 @@ $scenarios["D1-dev-bootstrap"] = [PSCustomObject]@{
     Tree = New-TreeNode $meta.Server @(
         (Get-ServerComposeDevTree -RemoteRoot $remoteComposeDev),
         (New-TreeNode "(Docker)" @(
-            (New-TreeNode "container: geostat-chat-bot-app"),
+            (New-TreeNode "container: $container"),
             (New-TreeNode "mount: $remoteComposeDev -> /app"),
             (New-TreeNode "develop.watch: src -> /app/src")
         ))
@@ -662,7 +665,7 @@ $scenarios["L0-legacy-flat"] = [PSCustomObject]@{
 $scenarios["_summary"] = [PSCustomObject]@{
     Title = "Senior architecture  - target structure"
     Notes = @(
-        "LOCAL: repo frontend/ + secrets/ + generated compose; logs under frontend/logs/.",
+        "LOCAL: manifest module paths + ops/config + generated compose; logs under module logs/.",
         "SERVER STATIC (recommended prod): {base}/static/{service}/dist + nginx.conf  - no source, no node_modules.",
         "SERVER COMPOSE (dev/staging): {base}/compose/{service}/  - full source; isolate from static.",
         "PATH: clarify DEPLOY_PATH  - base directory OR full service path; avoid silent /{container_name} append.",
@@ -689,7 +692,7 @@ if ($Markdown -or $OutFile) {
     $md = [System.Collections.ArrayList]@()
     [void]$md.Add("# Frontend deploy - full layout simulation")
     [void]$md.Add("")
-    [void]$md.Add('> Dry-run from `secrets/` + `geostat.ops.json`. Regenerate: geostat layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md')
+    [void]$md.Add('> Dry-run from `ops/config` + `geostat.ops.json`. Regenerate: geostat layout --frontend -Markdown -OutFile docs/FRONTEND-LAYOUT-SIMULATION-FULL.md')
     [void]$md.Add("")
     [void]$md.Add("## Resolved paths (this project)")
     [void]$md.Add("")

@@ -95,3 +95,73 @@ geostat_kit_sync_modules_path() {
   proj="$(geostat_find_project_root)" || return 1
   echo "$proj/$(geostat_read_manifest_field compose.syncModules apps/backend/ops.modules)"
 }
+
+# --- Module / secrets paths (manifest modules.*) ---
+
+geostat_module_path() {
+  local module_id="$1" proj rel
+  proj="$(geostat_find_project_root)" || return 1
+  rel="$(geostat_read_manifest_field "modules.${module_id}.path" "")"
+  [[ -n "$rel" ]] || return 1
+  echo "$proj/$rel"
+}
+
+geostat_secrets_module_name() {
+  local module_id="$1" sm
+  sm="$(geostat_read_manifest_field "modules.${module_id}.secretsModule" "$module_id")"
+  echo "$sm"
+}
+
+geostat_secrets_dir_for_module() {
+  local module_id="$1"
+  echo "$(geostat_secrets_root)/$(geostat_secrets_module_name "$module_id")"
+}
+
+geostat_stack_compose_dir() {
+  local proj rel
+  proj="$(geostat_find_project_root)" || return 1
+  rel="$(geostat_read_manifest_field stack.composeDir ops/compose/stack)"
+  echo "$proj/$rel"
+}
+
+geostat_manifest_feature_enabled() {
+  local name="$1" mf
+  mf="$(_geostat_manifest_file 2>/dev/null)" || { echo "false"; return; }
+  python3 -c "
+import json, sys
+m = json.load(open(sys.argv[1], encoding='utf-8'))
+f = (m.get('features') or {}).get(sys.argv[2])
+print('true' if f is True else 'false')
+" "$mf" "$name" 2>/dev/null || echo "false"
+}
+
+# Secrets folder names from manifest modules (one per line)
+geostat_list_secrets_module_folders() {
+  local mf
+  mf="$(_geostat_manifest_file 2>/dev/null)" || return 0
+  python3 -c "
+import json, sys
+m = json.load(open(sys.argv[1], encoding='utf-8'))
+seen = []
+for mid, cfg in (m.get('modules') or {}).items():
+    if not isinstance(cfg, dict):
+        continue
+    folder = str(cfg.get('secretsModule', mid))
+    if folder not in seen:
+        seen.append(folder)
+        print(folder)
+" "$mf" 2>/dev/null
+}
+
+# Fallback remote DEPLOY_PATH base: {server_base}/{project_slug}/{secrets_folder}
+geostat_default_remote_deploy_base() {
+  local secrets_folder="$1" base proj
+  base="$(geostat_env_value "$secrets_folder" DEPLOY_PATH "")"
+  if [[ -n "$base" ]]; then
+    echo "${base%/}"
+    return 0
+  fi
+  proj="$(geostat_project_slug)"
+  base="$(geostat_server_base)/$proj/$secrets_folder"
+  echo "${base%/}"
+}

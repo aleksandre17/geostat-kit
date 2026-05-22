@@ -63,11 +63,12 @@ def _manifest_paths(manifest: dict, repo_root: Path) -> list[tuple[str, Path]]:
     for key in ("integration", "prepareEnv", "waitHealth"):
         if rel := ci.get(key):
             out.append((f"ci.{key}", repo_root.joinpath(*rel.split("/"))))
+    adapter_file_keys = frozenset({"template", "output", "env", "envExample", "credentialsFile"})
     adapters = manifest.get("adapters", {})
     for name, cfg in adapters.items():
         if isinstance(cfg, dict):
             for k, rel in cfg.items():
-                if isinstance(rel, str) and "/" in rel:
+                if k in adapter_file_keys and isinstance(rel, str) and "/" in rel:
                     out.append((f"adapters.{name}.{k}", repo_root.joinpath(*rel.split("/"))))
     return out
 

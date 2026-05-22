@@ -75,6 +75,11 @@
         }
       }
     },
+    "features": {
+      "type": "object",
+      "description": "Optional project capabilities (package reads; defaults off in scaffold)",
+      "additionalProperties": { "type": "boolean" }
+    },
     "adapters": { "type": "object" },
     "ci": { "type": "object" }
   }

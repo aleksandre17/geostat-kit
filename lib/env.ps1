@@ -91,7 +91,7 @@ function Get-ComposeEnvFileArgs {
 }
 
 function Get-DeployEnvFile {
-    Join-Path (Get-MonorepoRoot) "secrets\deploy.env"
+    Join-Path (Get-SecretsRoot) "deploy.env"
 }
 
 function Get-DeployEnvValue {
@@ -156,7 +156,7 @@ function Get-StackComposeEnvFileArgs {
             [void]$args.Add($f)
         }
     }
-    $deployEnv = Join-Path (Get-MonorepoRoot) "secrets\deploy.env"
+    $deployEnv = Join-Path (Get-SecretsRoot) "deploy.env"
     if ((Test-Path $deployEnv) -and -not $seen[$deployEnv]) {
         [void]$args.Add("--env-file")
         [void]$args.Add($deployEnv)

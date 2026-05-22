@@ -1,6 +1,6 @@
 """
 Golden path matrix — maps scenario IDs to expected path kinds (no SSH).
-Ensures B/D/C paths stay separated per packages/geostat-kit/docs/GOLDEN-PATHS.md
+Ensures B/D/C paths stay separated per kits/geostat-kit/docs/GOLDEN-PATHS.md
 """
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import pytest
 
 from lib.deploy_paths import resolve_module_deploy_path
 
-BASE = "/home/administrator/geostat/frontend"
-APP = "geostat-chat-bot-app"
+BASE = "/home/example/my-app/frontend"
+APP = "test-app-app"
 
 # Scenario -> (deploy command family, expected path kind on server)
 BACKEND_GOLDEN_MATRIX = {
@@ -61,8 +61,8 @@ class TestGoldenPathKinds:
 
 
 class TestBackendGoldenPathKinds:
-    BE_BASE = "/home/administrator/geostat/backend"
-    BE_API = "geostat-chat-bot-api"
+    BE_BASE = "/home/example/my-app/backend"
+    BE_API = "test-app-api"
 
     @pytest.mark.parametrize("scenario,family,kind", [(k, v[0], v[1]) for k, v in BACKEND_GOLDEN_MATRIX.items()])
     def test_runtime_path_for_deploy_watch(self, scenario: str, family: str, kind: str):

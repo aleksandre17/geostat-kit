@@ -66,13 +66,17 @@ function Format-Tree {
 }
 
 $meta = Get-DeployMeta
-$feDeployBase = Get-SecretsEnvValue -Module "frontend" -Key "DEPLOY_PATH" -Default "$($meta.ServerBase)/$($meta.Project)/frontend"
-$beDeployBase = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_PATH" -Default "$($meta.ServerBase)/$($meta.Project)/backend"
+$feSeg = (Split-Path (Get-SecretsModuleDir "frontend") -Leaf)
+$beSeg = (Split-Path (Get-SecretsModuleDir "backend") -Leaf)
+$feDeployBase = Get-SecretsEnvValue -Module $feSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $feSeg)
+$beDeployBase = Get-SecretsEnvValue -Module $beSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $beSeg)
 $beLayout = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_LAYOUT" -Default "structured"
 
-$beDevSvc = Get-ComposeServices (Join-Path $RepoRoot "backend\docker-compose.dev.yml")
-$beProdSvc = Get-ComposeServices (Join-Path $RepoRoot "backend\docker-compose.prod.yml")
-$feSvc = Get-ComposeServices (Join-Path $RepoRoot "frontend\docker-compose.yml")
+$beRoot = Get-ManifestModulePath "backend"
+$feRoot = Get-ManifestModulePath "frontend"
+$beDevSvc = Get-ComposeServices (Join-Path $beRoot "docker-compose.dev.yml")
+$beProdSvc = Get-ComposeServices (Join-Path $beRoot "docker-compose.prod.yml")
+$feSvc = Get-ComposeServices (Join-Path $feRoot "docker-compose.yml")
 
 $scenarios = [ordered]@{}
 
@@ -191,7 +195,7 @@ $scenarios["_note"] = [PSCustomObject]@{
     Notes = @(
         "Backend: same folder layout; dev uses .env.dev + docker-compose.dev.yml, prod adds versions/ + rollback.",
         "Frontend: no --dev/--prod flag in deploy.ps1; dist=static prod UI, remote=compose prod overlay on server, local=laptop only.",
-        "Full-stack dev/prod on one host is usually deploy/compose locally, not these per-module SSH trees."
+        "Full-stack dev/prod on one host is usually ops/compose/stack locally, not these per-module SSH trees."
     )
 }
 

@@ -7,7 +7,7 @@ export GEOSTAT_PROJECT_ROOT="$ROOT"
 # shellcheck source=../../lib/env.sh
 source "$PKG/lib/env.sh"
 
-COMPOSE_REL="$(geostat_read_manifest_field stack.composeDir deploy/compose)"
+COMPOSE_REL="$(geostat_read_manifest_field stack.composeDir ops/compose/stack)"
 COMPOSE_DIR="$ROOT/$COMPOSE_REL"
 
 PROD=0

@@ -176,7 +176,7 @@ function Show-Checklist {
         $raw = Get-Content $path -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
         $todo = $false
         if ($raw -match 'YOUR_|example\.com|CHANGEME|user@YOUR') { $todo = $true }
-        if ($c.File -eq "secrets\deploy.env" -and $raw -match 'DEPLOY_PROJECT=\s*$') { $todo = $true }
+        if ($c.File -eq "ops\config\deploy.env" -and $raw -match 'DEPLOY_PROJECT=\s*$') { $todo = $true }
         $color = if ($todo) { "Yellow" } else { "Green" }
         $mark = if ($todo) { "[ ]" } else { "[✓]" }
         Write-Host "  $mark $($c.File)" -ForegroundColor $color
@@ -220,23 +220,21 @@ if ($MinimalCatalog) {
     }
 }
 
-# ── 3. Seed secrets (.example → working files) ───────────────────
+# ── 3. Seed ops/config (manifest modules via ci_prepare) ─────────
 if (-not $SkipSeed) {
-    Write-Step "Seed ops/config (examples → gitignored files)"
-    $seeds = @(
-        @{ Ex = "ops\config\deploy.env.example"; Tg = "ops\config\deploy.env" },
-        @{ Ex = "ops\config\frontend\.env.example"; Tg = "ops\config\frontend\.env.dev" },
-        @{ Ex = "ops\config\frontend\.env.example"; Tg = "ops\config\frontend\.env.prod" },
-        @{ Ex = "ops\config\frontend\.env.deploy.example"; Tg = "ops\config\frontend\.env.deploy" },
-        @{ Ex = "ops\config\frontend\nginx.env.example"; Tg = "ops\config\frontend\nginx.env"; Opt = $true },
-        @{ Ex = "ops\config\backend\.env.example"; Tg = "ops\config\backend\.env.dev" },
-        @{ Ex = "ops\config\backend\.env.example"; Tg = "ops\config\backend\.env.prod" },
-        @{ Ex = "ops\config\backend\.env.deploy.example"; Tg = "ops\config\backend\.env.deploy" }
-    )
-    foreach ($s in $seeds) {
-        $opt = [bool]$s.Opt
-        Copy-IfMissing -ExampleRel $s.Ex -TargetRel $s.Tg -Optional:$opt -Force:$ForceExamples
+    Write-Step "Seed ops/config (manifest modules)"
+    $py = Get-PythonCmd
+    if ($py) {
+        $env:PYTHONPATH = $PackageRoot
+        $seedPy = Join-Path $PackageRoot "lib\ci_prepare.py"
+        & @py $seedPy
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [warn] ci_prepare seed failed" -ForegroundColor Yellow
+        }
     }
+    $nginxEx = "ops\config\frontend\nginx.env.example"
+    $nginxTg = "ops\config\frontend\nginx.env"
+    Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
     Write-Step "Abstract deploy identity (COMPOSE_* from repo folder, not branded names)"
     Update-DeployEnvAbstractNames -Root $ProjectRoot -Force:$ForceExamples
 }

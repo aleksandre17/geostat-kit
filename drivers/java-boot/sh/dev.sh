@@ -61,7 +61,7 @@ if [[ "$SUB" == "help" || "$SUB" == "-h" || "$SUB" == "--help" ]]; then
   echo "  NOT the same as: be deploy (JAR → runtime/)"
   echo ""
   echo "  Example:"
-  echo "    geostat be dev bootstrap geostat-chat-bot-api"
+  echo "    geostat be dev bootstrap <compose-api-service>"
   echo "    geostat be dev watch"
   echo ""
   exit 0

@@ -15,7 +15,8 @@ git submodule add <repo-url> kits/geostat-kit
 `geostat.ops.json`: `"package": "kits/geostat-kit"`.
 
 სრული ინსტრუქცია (ამ monorepo-ში): [../../docs/KITS-PACKAGE.md](../../docs/KITS-PACKAGE.md)  
-**Git-ზე ატვირთვა (standalone repo):** [docs/PUBLISH-GIT.md](docs/PUBLISH-GIT.md)
+**Git-ზე ატვირთვა (standalone repo):** [docs/PUBLISH-GIT.md](docs/PUBLISH-GIT.md)  
+**Package architecture:** [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md)
 
 ## სახელმძღვანოები
 

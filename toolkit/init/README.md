@@ -23,7 +23,7 @@
 
 ## რას აკეთებს
 
-1. **apply-scaffold** — `tools/`, `secrets/*.example`, `infra/`, `deploy/`, `frontend|backend/ops.config*`, `geostat.ops.json`
+1. **apply-scaffold** — `tools/`, `ops/config/*.example`, `apps/*`, `ops/compose/`, `geostat.ops.json`
 2. **catalog** — `catalog.full.json` → `infra/compose/catalog.json` (სრული FE+BE+stack; `-MinimalCatalog` — მხოლოდ API)
 3. **seed** — `.example` → `deploy.env`, `.env.dev`, `.env.prod`, `.env.deploy`, `nginx.env`
 4. **.gitignore** — scaffold წესების დამატება

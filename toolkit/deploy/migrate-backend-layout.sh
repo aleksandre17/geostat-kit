@@ -27,7 +27,7 @@ SERVER="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_SERVER "$(geostat_deplo
 PROJECT="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PROJECT "")"
 [[ -n "$PROJECT" ]] || PROJECT="$(geostat_project_slug)"
 DEPLOY_PATH_BASE="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")"
-[[ -n "$DEPLOY_PATH_BASE" ]] || DEPLOY_PATH_BASE="$(geostat_server_base)/$PROJECT/backend"
+[[ -n "$DEPLOY_PATH_BASE" ]] || DEPLOY_PATH_BASE="$(geostat_default_remote_deploy_base "$OPS_SECRETS_MODULE")"
 DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE%/}"
 LAYOUT="$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_LAYOUT "flat")"
 

@@ -8,9 +8,9 @@ from lib.deploy_paths import (
     resolve_backend_deploy_path,
 )
 
-BASE = "/home/administrator/geostat/backend"
-API = "geostat-chat-bot-api"
-WORKER = "geostat-chat-bot-worker"
+BASE = "/home/example/my-app/backend"
+API = "test-app-api"
+WORKER = "test-app-worker"
 
 
 class TestBackendStructuredLayout:

@@ -38,7 +38,7 @@ def find_project_root() -> Path:
             (p / "kits" / "geostat-kit").is_dir() or (p / "packages" / "geostat-kit").is_dir()
         ):
             return p
-    raise SystemExit("ERROR: project root not found (geostat.ops.json or secrets/)")
+    raise SystemExit("ERROR: project root not found (geostat.ops.json or ops/config/)")
 
 
 def load_manifest(root: Path) -> dict:
@@ -49,7 +49,7 @@ def load_manifest(root: Path) -> dict:
 
 
 def catalog_path(root: Path, manifest: dict) -> Path:
-    rel = manifest.get("compose", {}).get("catalog", "infra/compose/catalog.json")
+    rel = manifest.get("compose", {}).get("catalog", "ops/compose/catalog.json")
     return root / rel
 
 
@@ -77,7 +77,7 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 def load_deploy_overrides(root: Path) -> dict[str, str]:
-    secrets = root / load_manifest(root).get("secrets", "secrets")
+    secrets = root / load_manifest(root).get("secrets", "ops/config")
     deploy = parse_env_file(secrets / "deploy.env")
     for key in DEPLOY_KEYS:
         if key in os.environ and os.environ[key]:

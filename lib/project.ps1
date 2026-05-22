@@ -22,7 +22,7 @@ function Get-ProjectRootFromManifest {
     if ($mf) { return Split-Path $mf -Parent }
     $dir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
     while ($dir) {
-        if (Test-Path (Join-Path $dir "secrets")) { return $dir }
+        if ((Test-Path (Join-Path $dir "ops\config")) -or (Test-Path (Join-Path $dir "secrets"))) { return $dir }
         $parent = Split-Path $dir -Parent
         if ($parent -eq $dir) { break }
         $dir = $parent
@@ -55,4 +55,36 @@ function Get-OpsPackageRoot {
 
 function Get-OpsToolkitPowerShellRoot {
     Join-Path (Get-OpsPackageRoot) "toolkit\powershell"
+}
+
+function Get-ManifestModulePath {
+    param([ValidateSet("frontend", "backend")][string]$ModuleId)
+    $proj = Get-ProjectRootFromManifest
+    if (-not $proj) { throw "geostat.ops.json not found" }
+    $rel = Get-ManifestField "modules.$ModuleId.path" "apps/$ModuleId"
+    Join-Path $proj ($rel -replace '/', '\')
+}
+
+function Get-StackComposeDirFromManifest {
+    $proj = Get-ProjectRootFromManifest
+    if (-not $proj) { throw "geostat.ops.json not found" }
+    $rel = Get-ManifestField "stack.composeDir" "ops/compose/stack"
+    Join-Path $proj ($rel -replace '/', '\')
+}
+
+function Get-ComposeAppServiceName {
+    $app = Get-DeployEnvValue "COMPOSE_APP_SERVICE"
+    if ($app) { return $app }
+    "$(Get-ComposeSlug)-app"
+}
+
+function Get-DefaultRemoteDeployPathBase {
+    param([Parameter(Mandatory = $true)][string]$SecretsFolder)
+    $base = Get-SecretsEnvValue -Module $SecretsFolder -Key "DEPLOY_PATH"
+    if ($base) { return $base.Trim().TrimEnd('/') }
+    $sb = Get-DeployServerBase
+    if ($sb) {
+        return "$sb/$(Get-ProjectSlug)/$SecretsFolder"
+    }
+    return $null
 }

@@ -5,8 +5,8 @@
 
 deploy_path_load_config() {
   DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")}"
-  if [[ -z "$DEPLOY_PATH_BASE" && -n "${SERVER_BASE:-}" && -n "${PROJECT:-}" ]]; then
-    DEPLOY_PATH_BASE="${SERVER_BASE}/${PROJECT}/backend"
+  if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" ]]; then
+    DEPLOY_PATH_BASE="$(geostat_default_remote_deploy_base "$OPS_SECRETS_MODULE")"
   fi
   DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE%/}"
   DEPLOY_LAYOUT="${DEPLOY_LAYOUT:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_LAYOUT "")}"

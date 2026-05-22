@@ -12,7 +12,7 @@
 |--------|----------------------------------|
 | Windows (რედაქტირება) | `frontend/src/Dockerfile` |
 | Linux deploy root | `{DEPLOY_PATH}/compose/dev/{container}/` |
-| იგივე ფაილი სერვერზე | `.../compose/dev/geostat-chat-bot-app/src/Dockerfile` |
+| იგივე ფაილი სერვერზე | `.../compose/dev/{COMPOSE_APP_SERVICE}/src/Dockerfile` |
 | კონტეინერში (volume) | `/app/src/Dockerfile` |
 
 `docker-compose.yml` (GENERATED):
@@ -70,7 +70,7 @@ apps/frontend/
 
 **არ მიდის:** `node_modules/`, `dist/` (exclude list: `Dev-Remote.ps1`).
 
-სერვერზე: `.../compose/dev/geostat-chat-bot-app/src/Dockerfile` — იგივე შიგთავსი, რაც Windows-ზე.
+სერვერზე: `.../compose/dev/{COMPOSE_APP_SERVICE}/src/Dockerfile` — იგივე შიგთავსი, რაც Windows-ზე.
 
 ### 2) `docker compose up -d --build` (Linux)
 

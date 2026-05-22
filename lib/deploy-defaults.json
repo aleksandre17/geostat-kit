@@ -1,5 +1,5 @@
 {
-  "description": "Default keys for compose generation and ops scripts. Override in secrets/deploy.env.",
+  "description": "Default keys for compose generation and ops scripts. Override in ops/config/deploy.env.",
   "keys": {
     "DEPLOY_PROJECT": "from_repo_folder",
     "COMPOSE_PROJECT_NAME": "from_repo_folder",

@@ -67,7 +67,7 @@ def registry_entry(registry: dict[str, Any], typ: str) -> dict[str, Any]:
     if typ not in registry:
         known = ", ".join(sorted(registry.keys()))
         raise SystemExit(
-            f"Unknown driver type '{typ}' — implement packages/geostat-kit/drivers/{typ}/ and register it. Known: {known}"
+            f"Unknown driver type '{typ}' — implement kits/geostat-kit/drivers/{typ}/ and register it. Known: {known}"
         )
     return registry[typ]
 

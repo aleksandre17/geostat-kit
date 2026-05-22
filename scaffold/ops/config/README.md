@@ -1,4 +1,4 @@
-﻿# secrets/ — project configuration (not in geostat-kit package)
+﻿# ops/config/ — project configuration (consumer repo, not in geostat-kit package)
 
 All runtime values live here. Application folders (`frontend/`, `backend/`) hold code only.
 

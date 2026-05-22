@@ -7,7 +7,7 @@ $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $Root = Get-ProjectRootFromManifest
 if (-not $Root) { throw "geostat.ops.json not found" }
 
-$composeRel = Get-ManifestField "stack.composeDir" "deploy/compose"
+$composeRel = Get-ManifestField "stack.composeDir" "ops/compose/stack"
 $ComposeDir = Join-Path $Root $composeRel
 
 $envArgs = Get-StackComposeEnvFileArgs -Environment $(if ($Prod) { "prod" } else { "dev" })

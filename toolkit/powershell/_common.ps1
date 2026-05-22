@@ -37,7 +37,7 @@ function Assert-Env {
     if ($missing) {
         Write-Host ""
         foreach ($k in $missing) { Write-Host "  [ERROR] Missing env key: $k" -ForegroundColor Red }
-        Write-Host "  Edit secrets/$OpsSecretsModule/.env.* and ops/config/deploy.env" -ForegroundColor Yellow
+        Write-Host "  Edit ops/config/$OpsSecretsModule/.env.* and ops/config/deploy.env" -ForegroundColor Yellow
         Write-Host ""
         exit 1
     }

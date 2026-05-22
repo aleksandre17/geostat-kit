@@ -16,8 +16,19 @@ def repo_module(repo_root: Path, manifest: dict, module_id: str) -> Path:
 
 
 def repo_secrets(repo_root: Path, manifest: dict) -> Path:
-    parts = manifest.get("secrets", "secrets").split("/")
+    parts = manifest.get("secrets", "ops/config").split("/")
     return repo_root.joinpath(*parts)
+
+
+@pytest.fixture
+def compose_service_names(manifest: dict) -> dict[str, str]:
+    """Abstract service names from manifest slug defaults (not project brands)."""
+    slug = "test-app"
+    return {
+        "api": f"{slug}-api",
+        "app": f"{slug}-app",
+        "worker": f"{slug}-worker",
+    }
 
 
 @pytest.fixture

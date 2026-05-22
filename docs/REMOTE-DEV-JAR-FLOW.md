@@ -62,8 +62,8 @@ COPY app.jar app.jar
 
 ```text
 {DEPLOY_PATH}/
-  runtime/geostat-chat-bot-api/     # be deploy, be deploy watch
-  workspace/geostat-chat-bot-api/   # be dev bootstrap, be dev watch
+  runtime/{COMPOSE_API_SERVICE}/     # be deploy, be deploy watch
+  workspace/{COMPOSE_API_SERVICE}/   # be dev bootstrap, be dev watch
 ```
 
 Do not mix without migration.

@@ -3,6 +3,9 @@
   "version": 2,
   "package": "kits/geostat-kit",
   "secrets": "ops/config",
+  "features": {
+    "gcpCredentials": false
+  },
   "compose": {
     "catalog": "ops/compose/catalog.json",
     "syncModules": "apps/backend/ops.modules"
@@ -37,6 +40,10 @@
     }
   },
   "adapters": {
+    "gcp": {
+      "credentialsFile": "google-credentials.json",
+      "containerMount": "/app/google-credentials.json"
+    },
     "nginx": {
       "template": "apps/frontend/nginx.conf.template",
       "output": "apps/frontend/nginx.conf",

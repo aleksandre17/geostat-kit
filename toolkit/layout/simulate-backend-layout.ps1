@@ -21,7 +21,8 @@ function Get-BeMeta {
     if (-not $project) { $project = Get-DeployEnvValue "DEPLOY_PROJECT" }
     if (-not $project) { $project = Get-ProjectSlug }
     $base = Get-DeployServerBase
-    $deployPath = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_PATH" -Default "$base/$project/backend"
+    $beSeg = (Split-Path (Get-SecretsModuleDir "backend") -Leaf)
+    $deployPath = Get-SecretsEnvValue -Module $beSeg -Key "DEPLOY_PATH" -Default (Get-DefaultRemoteDeployPathBase -SecretsFolder $beSeg)
     $layout = Get-SecretsEnvValue -Module "backend" -Key "DEPLOY_LAYOUT" -Default "flat"
     [PSCustomObject]@{
         Server     = $server
@@ -81,7 +82,7 @@ function Format-TreeLines {
 }
 
 $meta = Get-BeMeta
-$beRoot = Join-Path $RepoRoot "backend"
+$beRoot = Get-ManifestModulePath "backend"
 $beDev = Get-ComposeServices (Join-Path $beRoot "docker-compose.dev.yml")
 $beProd = Get-ComposeServices (Join-Path $beRoot "docker-compose.prod.yml")
 $api = $beProd | Where-Object { $_.Service -match "api" } | Select-Object -First 1
@@ -236,7 +237,7 @@ if ($Json) {
 $md = [System.Text.StringBuilder]::new()
 [void]$md.AppendLine("# Backend deploy - full layout simulation")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("> Dry-run from ``secrets/`` + ``geostat.ops.json``. Regenerate: ``geostat layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md``")
+[void]$md.AppendLine("> Dry-run from ``ops/config`` + ``geostat.ops.json``. Regenerate: ``geostat layout --backend -Markdown -OutFile docs/BACKEND-LAYOUT-SIMULATION-FULL.md``")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("## Resolved paths (this project)")
 [void]$md.AppendLine("")

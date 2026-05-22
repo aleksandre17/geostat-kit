@@ -22,13 +22,13 @@ Optional: `ERROR`, `WARN`, `INFO` (grep on log lines). Not applied to `docker` o
 ## Examples
 
 ```bash
-./tools/geostat.sh be manage geostat-chat-bot-api logs errors --prod
+./tools/geostat.sh be manage your-app-api logs errors --prod
 ./tools/geostat.sh be manage all logs app ERROR --prod
 ```
 
 ```powershell
 .\frontend\scripts\ps1\manage.ps1 logs errors
-.\frontend\scripts\ps1\manage.ps1 geostat-chat-bot-app logs app WARN
+.\tools\geostat.ps1 fe manage your-app-app logs app WARN
 ```
 
 ## Implementation

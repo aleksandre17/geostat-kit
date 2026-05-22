@@ -1,6 +1,6 @@
 """
 Deploy path resolution — single source for tests and tooling.
-Mirrors packages/geostat-kit/toolkit/powershell/Deploy-Path.ps1
+Mirrors kits/geostat-kit/toolkit/powershell/Deploy-Path.ps1
 """
 from __future__ import annotations
 

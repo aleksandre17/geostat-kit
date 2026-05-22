@@ -5,8 +5,8 @@ import pytest
 
 from lib.deploy_paths import deploy_path_candidates, resolve_module_deploy_path
 
-BASE = "/home/administrator/geostat/frontend"
-CONTAINER = "geostat-chat-bot-app"
+BASE = "/home/example/my-app/frontend"
+CONTAINER = "test-app-app"
 
 
 class TestStructuredLayout:

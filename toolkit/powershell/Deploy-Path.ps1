@@ -2,10 +2,8 @@
 
 function Get-DeployPathBase {
     $base = Get-EnvValue "DEPLOY_PATH"
-    if (-not $base -and $script:SERVER_BASE) {
-        $slug = $script:ProjectSlug
-        if (-not $slug) { $slug = Get-ProjectSlug }
-        $base = "$($script:SERVER_BASE)/$slug/frontend"
+    if (-not $base -and $script:SERVER_BASE -and $OpsSecretsModule) {
+        $base = Get-DefaultRemoteDeployPathBase -SecretsFolder $OpsSecretsModule
     }
     if ($base) { return $base.Trim().TrimEnd('/') }
     return $null
@@ -221,7 +219,7 @@ function Publish-RemoteEnvFiles {
         Get-Content $f | ForEach-Object { [void]$lines.Add($_) }
     }
     $root = Get-MonorepoRoot
-    $deployEnv = Join-Path $root "secrets\deploy.env"
+    $deployEnv = Join-Path (Get-SecretsRoot) "deploy.env"
     if (Test-Path $deployEnv) {
         [void]$lines.Add("")
         [void]$lines.Add("# from deploy.env")

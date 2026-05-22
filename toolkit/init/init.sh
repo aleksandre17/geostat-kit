@@ -39,19 +39,14 @@ copy_seed() {
 }
 
 echo ""
-echo "  ▸ Seed secrets"
-copy_seed ops/config/deploy.env.example ops/config/deploy.env
-copy_seed ops/config/frontend/.env.example ops/config/frontend/.env.dev
-copy_seed ops/config/frontend/.env.example ops/config/frontend/.env.prod
-copy_seed ops/config/frontend/.env.deploy.example ops/config/frontend/.env.deploy
-copy_seed ops/config/backend/.env.example ops/config/backend/.env.dev
-copy_seed ops/config/backend/.env.example ops/config/backend/.env.prod
-copy_seed ops/config/backend/.env.deploy.example ops/config/backend/.env.deploy
+echo "  ▸ Seed ops/config (manifest modules)"
+export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"
+python3 "$PKG/lib/ci_prepare.py" || py -3 "$PKG/lib/ci_prepare.py" || echo "  [warn] seed failed — run: python3 kits/geostat-kit/lib/ci_prepare.py"
 
-if [[ ! -f "$ROOT/infra/compose/catalog.json" && -f "$SCAFFOLD/infra/compose/catalog.full.json" ]]; then
-  mkdir -p "$ROOT/infra/compose"
-  cp "$SCAFFOLD/infra/compose/catalog.full.json" "$ROOT/infra/compose/catalog.json"
-  echo "  [OK]   infra/compose/catalog.json (full)"
+if [[ ! -f "$ROOT/ops/compose/catalog.json" && -f "$SCAFFOLD/ops/compose/catalog.full.json" ]]; then
+  mkdir -p "$ROOT/ops/compose"
+  cp "$SCAFFOLD/ops/compose/catalog.full.json" "$ROOT/ops/compose/catalog.json"
+  echo "  [OK]   ops/compose/catalog.json (full)"
 fi
 
 echo ""

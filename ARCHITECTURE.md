@@ -2,30 +2,29 @@
 
 ## Boundaries
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
-│  kits/geostat-kit  (this package — copy/submodule)   │
-│  lib · compose · toolkit · adapters · contracts · ci     │
+│  kits/geostat-kit  (this package — copy/submodule)      │
+│  lib · compose · toolkit · adapters · contracts · ci    │
 └───────────────────────────┬─────────────────────────────┘
                             │ geostat.ops.json
 ┌───────────────────────────▼─────────────────────────────┐
-│  Project (geostat-chat-bot, your-app, …)                 │
-│  secrets/ · infra/compose/catalog.json · generated yml   │
-│  backend/ops.config.* · frontend/ops.config.*          │
-│  scripts/ci/* (project integration only)               │
+│  Consumer project (your-app, …)                         │
+│  ops/config/ · ops/compose/catalog.json · apps/*        │
+│  generated docker-compose*.yml · ops/compose/stack/     │
 └───────────────────────────┬─────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────┐
-│  Applications (Spring, Vite, …)                          │
+│  Applications (Spring, Vite, …)                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## What must never be added here
 
 - Real `DEPLOY_SERVER`, API keys, CSP production domains
-- `docker-compose*.yml` (generated in project)
+- `docker-compose*.yml` (generated in the consumer project)
 - Java/TS business code
-- Project-specific health check URLs (stay in `scripts/ci/`)
+- Consumer-specific health check URLs (stay in project `ops/ci/`)
 
 ## Entry points
 
@@ -35,14 +34,15 @@
 | `geostat nginx-gen` | `adapters/render_nginx.py` |
 | `geostat stack` | `toolkit/stack/compose.ps1` |
 | `geostat infra` | `toolkit/infra/ensure-prereqs.sh` |
-| `be deploy` | `toolkit/deploy/*.sh` via module `deploy.sh` |
+| `geostat init` | `toolkit/init/` → `lib/ci_prepare.py` |
+| `be deploy` / `fe deploy` | `toolkit/deploy/` via drivers |
 
 ## Manifest
 
-`geostat.ops.json` at project root — see [manifest.schema.json](manifest.schema.json).
+`geostat.ops.json` at project root — see [manifest.schema.json](manifest.schema.json) and [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md).
+
+Resolution API: `lib/project_context.py` (Python), `lib/project.sh` + `lib/env.sh` (Bash), `lib/project.ps1` + `lib/env.ps1` (PowerShell).
 
 ## Deploy golden paths
 
-Which CLI to use (Windows vs Linux, static `dist/` vs `compose/dev/`, `deploy watch` vs `dev watch`, deprecated modes):
-
-**[docs/GOLDEN-PATHS.md](docs/GOLDEN-PATHS.md)** — canonical policy for teams using this package.
+**[docs/GOLDEN-PATHS.md](docs/GOLDEN-PATHS.md)** — canonical policy (static dist vs compose/dev, local vs remote).
