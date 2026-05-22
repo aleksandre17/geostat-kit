@@ -1,7 +1,6 @@
 """Compose naming — manifest modules, optional deploy.env legacy overrides."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from lib.compose_identity import (
@@ -52,19 +51,19 @@ def _manifest() -> dict:
 def test_default_names_from_manifest_without_compose_env(tmp_path: Path) -> None:
     manifest = _manifest()
     deploy: dict[str, str] = {}
-    names = compose_service_names(manifest, deploy, "geostat-chat-bot")
-    assert names["api"] == "geostat-chat-bot-api"
-    assert names["app"] == "geostat-chat-bot-app"
-    assert names["worker"] == "geostat-chat-bot-ingestion"
-    assert names["modules"]["retrieval"] == "geostat-chat-bot-retrieval"
+    names = compose_service_names(manifest, deploy, "my-app")
+    assert names["api"] == "my-app-api"
+    assert names["app"] == "my-app-app"
+    assert names["worker"] == "my-app-ingestion"
+    assert names["modules"]["retrieval"] == "my-app-retrieval"
 
 
 def test_deploy_project_does_not_change_compose_slug() -> None:
     manifest = _manifest()
     deploy = {"DEPLOY_PROJECT": "geostat"}
-    names = compose_service_names(manifest, deploy, "geostat-chat-bot")
-    assert names["compose_slug"] == "geostat-chat-bot"
-    assert names["api"] == "geostat-chat-bot-api"
+    names = compose_service_names(manifest, deploy, "my-app")
+    assert names["compose_slug"] == "my-app"
+    assert names["api"] == "my-app-api"
 
 
 def test_legacy_override_primary_api_only(tmp_path: Path) -> None:
@@ -80,9 +79,9 @@ def test_build_global_fmt_matches_compose_gen_keys(tmp_path: Path) -> None:
     secrets.mkdir(parents=True)
     (secrets / "deploy.env").write_text("DOCKER_NETWORK=custom-net\n", encoding="utf-8")
     deploy = load_deploy_env(secrets)
-    fmt = build_global_fmt(manifest=manifest, deploy=deploy, repo_name="geostat-chat-bot")
-    assert fmt["api_service"] == "geostat-chat-bot-api"
-    assert fmt["app_service"] == "geostat-chat-bot-app"
+    fmt = build_global_fmt(manifest=manifest, deploy=deploy, repo_name="my-app")
+    assert fmt["api_service"] == "my-app-api"
+    assert fmt["app_service"] == "my-app-app"
     assert fmt["network_name"] == "custom-net"
 
 
@@ -91,6 +90,10 @@ def test_project_context_compose_names(repo_root: Path) -> None:
 
     ctx = ProjectContext.discover(repo_root)
     names = ctx.compose_service_names()
+    slug = repo_root.name
     assert "modules" in names
+    assert names.get("compose_slug") == slug
+    assert names.get("api") == f"{slug}-api"
+    assert names.get("app") == f"{slug}-app"
     assert names["modules"].get("retrieval", "").endswith("-retrieval")
-    assert "geostat-chat" not in json.dumps(names).lower() or "geostat-chat-bot" in json.dumps(names)
+    assert names["modules"]["retrieval"] == f"{slug}-retrieval"
