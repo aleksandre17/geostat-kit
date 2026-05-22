@@ -30,10 +30,6 @@ cd kits/geostat-kit && git checkout v1.0.0
 
 სრული: [ADOPTION-LINE.md](ADOPTION-LINE.md) · [STARTER.md](STARTER.md)
 
-## GitHub
+## ვერსია
 
-**About:** Manifest-driven ops for SaaS monorepos — compose, SSH deploy, CI, VS Code debug.
-
-**Topics:** `devops` `docker-compose` `monorepo` `spring-boot` `vite` `cli`
-
-**Tag:** `v1.0.0` — იხ. [PUBLISH-GIT.md](PUBLISH-GIT.md)
+ჩართვისას დააფიქსირე tag **`v1.0.0`** (იხ. [CHANGELOG.md](../CHANGELOG.md)).

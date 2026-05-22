@@ -9,7 +9,6 @@ Compose generation, SSH deploy, env contract, multi-module CLI — **no** applic
 | **Install** | [docs/INSTALL.md](docs/INSTALL.md) |
 | **What it is** | [docs/ADOPTION.md](docs/ADOPTION.md) |
 | **Full setup** | [docs/ADOPTION-LINE.md](docs/ADOPTION-LINE.md) |
-| **Publish** | [docs/PUBLISH-GIT.md](docs/PUBLISH-GIT.md) |
 
 ## Install (others download your package)
 
@@ -84,4 +83,4 @@ Release tag: **`v1.0.0`**
 
 ## License
 
-Add your license file before public publish (MIT, Apache-2.0, or proprietary). This repo ships without `LICENSE` until you choose one on GitHub.
+Add your license file when you distribute the package (MIT, Apache-2.0, or proprietary). This repo may ship without `LICENSE` until you add one.

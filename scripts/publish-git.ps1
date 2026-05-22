@@ -51,5 +51,5 @@ if ($Tag) {
 Write-Host ""
 Write-Host "  Next: create empty repo on GitHub, then:" -ForegroundColor Yellow
 Write-Host "    .\scripts\publish-git.ps1 -RemoteUrl https://github.com/USER/geostat-kit.git"
-Write-Host "  Docs: docs/PUBLISH-GIT.md"
+Write-Host "  See README + docs/INSTALL.md for consumers."
 Write-Host ""
