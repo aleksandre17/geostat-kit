@@ -52,8 +52,8 @@ dev_workspace_path_for() {
 dev_assert_structured_layout() {
   deploy_path_load_config
   if [[ "$DEPLOY_LAYOUT" != "structured" ]]; then
-    echo "  ERROR: be dev requires DEPLOY_LAYOUT=structured in ops/config/backend/.env.deploy" >&2
-    echo "  Copy ops/config/backend/.env.deploy.example → .env.deploy" >&2
+    echo "  ERROR: dev requires DEPLOY_LAYOUT=structured in ${SECRETS_DIR}/.env.deploy" >&2
+    echo "  Copy ${SECRETS_DIR}/.env.deploy.example → .env.deploy" >&2
     return 1
   fi
   return 0

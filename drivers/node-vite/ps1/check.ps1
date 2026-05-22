@@ -39,9 +39,9 @@ Test-Check ".env.prod" { Test-Path (Join-Path $SECRETS_DIR ".env.prod") }
 Test-Check "docker-compose.yml" { Test-Path (Join-Path $ROOT $OpsComposeFile) }
 Test-Check "nginx.conf.template" { Test-Path (Join-Path $ROOT "nginx.conf.template") }
 Test-Check "nginx.conf" { Test-Path (Join-Path $ROOT "nginx.conf") }
-$nginxEnv = Join-Path (Split-Path $SECRETS_DIR -Parent) "frontend\nginx.env"
+$nginxEnv = Join-Path $SECRETS_DIR "nginx.env"
 if (-not (Test-Path $nginxEnv)) {
-    Test-Warn "ops/config/frontend/nginx.env" "copy nginx.env.example for production CSP parents"
+    Test-Warn "${SECRETS_DIR}/nginx.env" "copy nginx.env.example for production CSP parents"
 }
 Test-Check "VITE_API_URL in .env.prod" { [bool](Get-EnvValue "VITE_API_URL") }
 

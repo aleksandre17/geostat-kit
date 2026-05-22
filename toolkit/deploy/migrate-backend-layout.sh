@@ -5,7 +5,7 @@
 #   geostat toolkit ...  OR from repo:
 #   bash kits/geostat-kit/toolkit/deploy/migrate-backend-layout.sh [--dry-run] [--dev|--prod]
 #
-# Requires: ops/config/backend/.env.deploy (DEPLOY_LAYOUT=structured), ops/config/deploy.env
+# Requires: api module .env.deploy (DEPLOY_LAYOUT=structured), ops/config/deploy.env
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ done
 COMPOSE_FILE="docker-compose.${ENVIRONMENT}.yml"
 
 if [[ "$LAYOUT" != "structured" ]]; then
-  echo "  ERROR: DEPLOY_LAYOUT must be structured in ops/config/backend/.env.deploy" >&2
+  echo "  ERROR: DEPLOY_LAYOUT must be structured in ${SECRETS_DIR}/.env.deploy" >&2
   exit 1
 fi
 [[ -n "$SERVER" ]] || { echo "  ERROR: DEPLOY_SERVER not set" >&2; exit 1; }

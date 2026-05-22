@@ -57,7 +57,7 @@ if [[ "$SUB" == "help" || "$SUB" == "-h" || "$SUB" == "--help" ]]; then
   echo "  watch       poll saves → rsync (DevTools restart in container; use --restart to force compose restart)"
   echo "  restart     docker compose restart on server"
   echo ""
-  echo "  Requires: ops/config/backend/.env.deploy (DEPLOY_LAYOUT=structured), rsync"
+  echo "  Requires: ${SECRETS_DIR:-ops/config/<secretsModule>}/.env.deploy (DEPLOY_LAYOUT=structured), rsync"
   echo "  NOT the same as: be deploy (JAR → runtime/)"
   echo ""
   echo "  Example:"
@@ -115,7 +115,7 @@ case "$SUB" in
     port_var="$(dev_port_var_for "$SERVICE")"
     def_port="$(dev_default_port_for "$SERVICE")"
     echo "  [OK] bootRun on server — check logs: geostat be manage $SERVICE logs --dev"
-    echo "  API URL from ops/config/backend/.env.dev (\$$port_var default $def_port)"
+    echo "  API URL from ${SECRETS_DIR:-<secrets>}/.env.dev (\$$port_var default $def_port)"
     ;;
 
   sync)

@@ -10,6 +10,8 @@ _PKG = Path(__file__).resolve().parents[1]
 if str(_PKG) not in sys.path:
     sys.path.insert(0, str(_PKG))
 
+from lib.manifest_defaults import load_scaffold_manifest
+from lib.modules import module_by_role, module_by_type
 from lib.project_context import ProjectContext  # noqa: E402
 
 PLACEHOLDER = "__NGINX_FRAME_ANCESTORS__"
@@ -44,11 +46,41 @@ def main() -> int:
     nginx = (ctx.manifest.get("adapters") or {}).get("nginx") or {}
     if not isinstance(nginx, dict):
         nginx = {}
+    if not nginx:
+        sc_nginx = (load_scaffold_manifest().get("adapters") or {}).get("nginx") or {}
+        if isinstance(sc_nginx, dict):
+            nginx = sc_nginx
 
-    template = root / str(nginx.get("template", "apps/frontend/nginx.conf.template"))
-    output = root / str(nginx.get("output", "apps/frontend/nginx.conf"))
-    env_example = root / str(nginx.get("envExample", "ops/config/frontend/nginx.env.example"))
-    env_file = root / str(nginx.get("env", "ops/config/frontend/nginx.env"))
+    def _nginx_field(key: str) -> str:
+        if nginx.get(key):
+            return str(nginx[key])
+        ui_id = ctx.module_id_for_role("ui") or ctx.module_id_for_type("node-vite", 0)
+        if not ui_id:
+            return ""
+        rel = ctx.module_path(ui_id).relative_to(root).as_posix()
+        sec = ctx.secrets_module_folder(ui_id)
+        if key == "template":
+            return f"{rel}/nginx.conf.template"
+        if key == "output":
+            return f"{rel}/nginx.conf"
+        if key == "envExample":
+            return f"{ctx.field('secrets')}/{sec}/nginx.env.example"
+        if key == "env":
+            return f"{ctx.field('secrets')}/{sec}/nginx.env"
+        return ""
+
+    template_rel = _nginx_field("template")
+    output_rel = _nginx_field("output")
+    env_example_rel = _nginx_field("envExample")
+    env_file_rel = _nginx_field("env")
+    if not template_rel:
+        print("ERROR: adapters.nginx.template or ui module required in geostat.ops.json", file=sys.stderr)
+        return 1
+
+    template = root / template_rel
+    output = root / output_rel
+    env_example = root / env_example_rel
+    env_file = root / env_file_rel
 
     if not template.is_file():
         print(f"ERROR: missing {template}", file=sys.stderr)

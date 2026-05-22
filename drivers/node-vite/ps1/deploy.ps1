@@ -33,7 +33,7 @@ if ($Arg1 -in @("help", "-h", "--help")) {
     Write-Host "  Modes: local | dist | remote | sync | watch" -ForegroundColor Gray
     Write-Host "  watch = static dist + nginx (NOT fe dev watch)" -ForegroundColor Gray
     Write-Host "  -Environment dev|prod  -DebounceMs 3000  -NoInitialSync (watch only)" -ForegroundColor Gray
-    Write-Host "  DEPLOY_LAYOUT=structured in ops/config/frontend/.env.deploy" -ForegroundColor Gray
+    Write-Host "  DEPLOY_LAYOUT=structured in ${SECRETS_DIR}/.env.deploy" -ForegroundColor Gray
     Write-Host ""
     exit 0
 }

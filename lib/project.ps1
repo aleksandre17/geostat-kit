@@ -110,13 +110,36 @@ function Get-ModuleIdByDriverType {
     return $null
 }
 
+function Get-SecretsConfigRel {
+    (Get-ManifestField "secrets") -replace '\\', '/'
+}
+
+function Get-ModuleEnvPathLabels {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleId,
+        [Parameter(Mandatory = $true)][string[]]$FileNames
+    )
+    $base = "$(Get-SecretsConfigRel)/$(Get-ModuleSecretsFolder $ModuleId)"
+    foreach ($name in $FileNames) { "$base/$name" }
+}
+
+function Get-DeployEnvPathLabel {
+    "$(Get-SecretsConfigRel)/deploy.env"
+}
+
 function Get-ListedSecretsModuleFolders {
     $mf = Get-ProjectManifestPath
     if (-not $mf) {
-        return @(
-            (Get-ScaffoldManifestField "modules.frontend.secretsModule"),
-            (Get-ScaffoldManifestField "modules.backend.secretsModule")
-        ) | Where-Object { $_ }
+        $sc = Get-ScaffoldManifestPath
+        if (-not (Test-Path $sc)) { return @() }
+        $data = Get-Content $sc -Raw | ConvertFrom-Json
+        $seen = @{}
+        $out = [System.Collections.ArrayList]@()
+        foreach ($p in $data.modules.PSObject.Properties) {
+            $folder = if ($p.Value.secretsModule) { [string]$p.Value.secretsModule } else { [string]$p.Name }
+            if (-not $seen[$folder]) { $seen[$folder] = $true; [void]$out.Add($folder) }
+        }
+        return $out.ToArray()
     }
     $data = Get-Content $mf -Raw | ConvertFrom-Json
     $seen = @{}

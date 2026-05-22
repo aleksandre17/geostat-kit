@@ -1,7 +1,6 @@
-# Copy to <module>/ops.config.sh and edit
-OPS_SECRETS_MODULE="backend"
-# Leave empty to use secrets/deploy.env DEPLOY_PROJECT or repo folder name
+# Copy to <module>/ops.config.sh — set secretsModule from geostat.ops.json modules.<id>
+OPS_SECRETS_MODULE="<secretsModule>"
 OPS_PROJECT_NAME=""
-OPS_TARGET_DEFAULT="backend"
+OPS_TARGET_DEFAULT="<moduleId>"
 VERSIONS_KEEP=5
 HEALTH_RETRIES=24

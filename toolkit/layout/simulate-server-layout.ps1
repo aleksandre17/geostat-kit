@@ -7,10 +7,14 @@ $ErrorActionPreference = "Stop"
 $PackageRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 . (Join-Path $PackageRoot "lib\project.ps1")
 . (Join-Path $PackageRoot "lib\env.ps1")
+. (Join-Path $PackageRoot "lib\modules.ps1")
 $RepoRoot = Get-ProjectRootFromManifest
 if (-not $RepoRoot) { throw "geostat.ops.json not found" }
-$script:FeModuleId = Get-ModuleIdByDriverType "node-vite"
-$script:BeModuleId = Get-ModuleIdByDriverType "java-boot"
+$env:GEOSTAT_PROJECT_ROOT = $RepoRoot
+$script:FeModuleId = Get-ModuleIdByRole "ui"
+if (-not $script:FeModuleId) { $script:FeModuleId = (Get-ModuleIdsByDriverType "node-vite" | Select-Object -First 1) }
+$script:BeModuleId = Get-ModuleIdByRole "api"
+if (-not $script:BeModuleId) { $script:BeModuleId = (Get-ModuleIdsByDriverType "java-boot" | Select-Object -First 1) }
 $script:FeSecretsFolder = if ($script:FeModuleId) { Get-ModuleSecretsFolder $script:FeModuleId } else { $null }
 $script:BeSecretsFolder = if ($script:BeModuleId) { Get-ModuleSecretsFolder $script:BeModuleId } else { $null }
 

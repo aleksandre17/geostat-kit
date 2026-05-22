@@ -154,18 +154,36 @@ function Get-PythonCmd {
 
 function Show-Checklist {
     param([string]$Root)
+    $env:GEOSTAT_PROJECT_ROOT = $Root
+    . (Join-Path $PackageRoot "lib\project.ps1")
+    . (Join-Path $PackageRoot "lib\modules.ps1")
+
     Write-Host ""
     Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
     Write-Host "  Fill in (search for YOUR_ / example.com / empty values)" -ForegroundColor Yellow
     Write-Host "  ═══════════════════════════════════════════════════════" -ForegroundColor DarkCyan
 
     $checks = @(
-        @{ File = "ops\config\deploy.env"; Hints = @("DEPLOY_SERVER", "DEPLOY_PROJECT") },
-        @{ File = "ops\config\frontend\.env.prod"; Hints = @("VITE_API_URL") },
-        @{ File = "ops\config\backend\.env.dev"; Hints = @("GEMINI", "GCP", "API_KEY") },
-        @{ File = "ops\config\backend\.env.prod"; Hints = @("GEMINI", "GCP", "API_KEY") },
-        @{ File = "ops\config\backend\google-credentials.json"; Hints = @("(file)") }
+        @{ File = (Get-DeployEnvPathLabel -replace '/', '\'); Hints = @("DEPLOY_SERVER", "DEPLOY_PROJECT") }
     )
+    foreach ($mid in Get-ProjectModules) {
+        $role = Get-ModuleRole $mid
+        $sm = Get-ModuleSecretsFolder $mid
+        $hints = switch ($role) {
+            "ui" { @("VITE_API_URL") }
+            "api" { @("GEMINI", "GCP", "API_KEY") }
+            "worker" { @("API_INTERNAL_URL") }
+            default { @() }
+        }
+        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.dev" -replace '/', '\'; Hints = $hints }
+        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.prod" -replace '/', '\'; Hints = $hints }
+        $checks += @{ File = "$(Get-SecretsConfigRel)/$sm/.env.deploy" -replace '/', '\'; Hints = @("DEPLOY_PATH") }
+    }
+    $uiMod = Get-ModuleIdByRole "ui"
+    if ($uiMod) {
+        $nginxTg = (Get-ManifestField "adapters.nginx.env") -replace '/', '\'
+        if ($nginxTg) { $checks += @{ File = $nginxTg; Hints = @("NGINX_FRAME_ANCESTORS") } }
+    }
 
     foreach ($c in $checks) {
         $path = Join-Path $Root ($c.File -replace '/', '\')
@@ -186,7 +204,7 @@ function Show-Checklist {
     Write-Host "  Commands:" -ForegroundColor Cyan
     Write-Host "    .\tools\geostat.ps1 compose-gen    # after catalog edits"
     Write-Host "    .\tools\geostat.ps1 stack up -d --build"
-    Write-Host "    .\tools\geostat.ps1 fe check | be check"
+    Write-Host "    .\tools\geostat.ps1 mod <moduleId> check   # or cli aliases (fe, be, ui, api)"
     Write-Host "  Docs: kits\geostat-kit\docs\ADOPTION-LINE.md"
     Write-Host ""
 }
@@ -232,9 +250,11 @@ if (-not $SkipSeed) {
             Write-Host "  [warn] ci_prepare seed failed" -ForegroundColor Yellow
         }
     }
-    $nginxEx = "ops\config\frontend\nginx.env.example"
-    $nginxTg = "ops\config\frontend\nginx.env"
-    Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
+    $nginxEx = (Get-ManifestField "adapters.nginx.envExample") -replace '/', '\'
+    $nginxTg = (Get-ManifestField "adapters.nginx.env") -replace '/', '\'
+    if ($nginxEx -and $nginxTg) {
+        Copy-IfMissing -ExampleRel $nginxEx -TargetRel $nginxTg -Optional:$true -Force:$ForceExamples
+    }
     Write-Step "Abstract deploy identity (COMPOSE_* from repo folder, not branded names)"
     Update-DeployEnvAbstractNames -Root $ProjectRoot -Force:$ForceExamples
 }

@@ -20,15 +20,13 @@ WARNINGS=0
 
 # ── Parse args ──
 SERVICE="all"
-TARGET="backend"
+TARGET="${OPS_SECRETS_MODULE:-backend}"
 SKIP_BUILD=0
 for arg in "$@"; do
     case "$arg" in
-        --no-build) SKIP_BUILD=1      ;;
-        all)        SERVICE="all"     ;;
-        backend)    TARGET="backend"  ;;
-        frontend)   TARGET="frontend" ;;
-        *)          SERVICE="$arg"    ;;
+        --no-build) SKIP_BUILD=1 ;;
+        all)        SERVICE="all" ;;
+        *)          SERVICE="$arg" ;;
     esac
 done
 
@@ -70,11 +68,11 @@ else
     fail "docker-compose.prod.yml missing"
 fi
 
-# .env.prod (ops/config/backend)
+# .env.prod (module secrets dir)
 if [ -f "$SECRETS_DIR/.env.prod" ]; then
-    ok "ops/config/backend/.env.prod found"
+    ok "${SECRETS_DIR}/.env.prod found"
 else
-    fail "ops/config/backend/.env.prod missing  (see ops/config/backend/.env.example)"
+    fail "${SECRETS_DIR}/.env.prod missing  (see ${SECRETS_DIR}/.env.example)"
 fi
 
 # gradlew

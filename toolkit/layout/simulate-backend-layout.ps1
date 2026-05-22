@@ -137,7 +137,7 @@ $scenarios["R1-deploy-dev"] = @{
         "    |-- logs/",
         "    +-- info.log"
     )
-    Notes = @("Structured layout requires ops/config/backend/.env.deploy.")
+    Notes = @("Structured layout requires $(Get-ModuleEnvPathLabels $script:BeModuleId @('.env.deploy')).")
 }
 
 $scenarios["R2-deploy-prod"] = @{
