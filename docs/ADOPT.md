@@ -4,7 +4,7 @@
 
 **→ [ADOPTION-LINE.md](ADOPTION-LINE.md)**
 
-მოკლე შემოწმება:
+ შემოწმება:
 
 ```powershell
 copy kits\geostat-kit\scaffold\geostat.ops.json geostat.ops.json

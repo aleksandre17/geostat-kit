@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from lib.credentials import global_gcp_credentials, module_credentials
 from lib.manifest_defaults import (
     default_field,
     legacy_root_discovery_enabled,
@@ -32,9 +33,13 @@ def _read_nested(data: dict[str, Any], dotted: str, default: str = "") -> str:
 
 
 def find_project_root(start: Path | None = None) -> Path:
-    if os.environ.get("GEOSTAT_PROJECT_ROOT"):
-        return Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
     start = (start or Path.cwd()).resolve()
+    if (start / "geostat.ops.json").is_file():
+        return start
+    if os.environ.get("GEOSTAT_PROJECT_ROOT"):
+        env_root = Path(os.environ["GEOSTAT_PROJECT_ROOT"]).resolve()
+        if (env_root / "geostat.ops.json").is_file():
+            return env_root
     for p in [start, *start.parents]:
         if (p / "geostat.ops.json").is_file():
             return p
@@ -152,19 +157,11 @@ class ProjectContext:
         return False
 
     def gcp_credentials_filename(self) -> str | None:
-        if not self.feature_enabled("gcpCredentials"):
-            return None
-        gcp = (self.manifest.get("adapters") or {}).get("gcp") or {}
-        if isinstance(gcp, dict) and gcp.get("enabled") is False:
-            return None
-        fn = _read_nested(
-            self.manifest,
-            "adapters.gcp.credentialsFile",
-            _read_nested(load_scaffold_manifest(), "adapters.gcp.credentialsFile", "google-credentials.json"),
-        )
-        if isinstance(gcp, dict) and gcp.get("credentialsFile"):
-            fn = str(gcp["credentialsFile"])
-        return fn
+        creds = global_gcp_credentials(self.manifest)
+        return creds[0]["file"] if creds else None
+
+    def module_credentials_list(self, module_id: str) -> list[dict[str, str]]:
+        return module_credentials(self.manifest, module_id)
 
     def secrets_module_folder(self, module_id: str) -> str:
         cfg = (self.manifest.get("modules") or {}).get(module_id)

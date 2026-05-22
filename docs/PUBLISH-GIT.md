@@ -1,23 +1,54 @@
-# geostat-kit — Git-ზე ატვირთვა (standalone repo)
+# Publish geostat-kit — standalone package only
 
-პაკეტი ცალკე repository-ად იწერება; პროექტები იღებენ **`kits/geostat-kit`** submodule-ით ან copy-ით.
+ამ გზამკვლევით **მხოლოდ** `geostat-kit` repo ადის GitHub-ზე. Consumer პროექტი (`geostat-chat-bot`) ამ ეტაპზე არ სჭირდება.
 
-## 1. ლოკალური repo (უკვე გაკეთებული ერთხელ)
+## Before push (maintainer checklist)
+
+```powershell
+cd path\to\geostat-kit   #=this repo root
+
+$env:PYTHONPATH = (Get-Location).Path
+python -m pytest tests -q
+
+.\scripts\dev-modes-verify.ps1 -SkipDocker
+```
+
+- [ ] `VERSION` = `1.0.0`
+- [ ] `CHANGELOG.md` updated
+- [ ] No `deploy.env`, keys, `google-credentials.json` (only `.example` in scaffold)
+- [ ] `README.md` + `docs/INSTALL.md` — GitHub URL შეცვლილი `YOUR_USER` → შენი org
+- [ ] License chosen (add `LICENSE` file or GitHub license on create)
+
+## 1. GitHub — empty repository
+
+1. https://github.com/new
+2. Name: **`geostat-kit`**
+3. Public (or private, then grant access)
+4. **Do not** add README, .gitignore, license (you already have them locally)
+
+## 2. Commit everything (if pending)
 
 ```powershell
 cd C:\Users\Test-User\CursorProjects\geostat-chat-bot\kits\geostat-kit
-git init
-git add .
-git commit -m "chore: geostat-kit v1.0.0 — ops package (v2 layout scaffold)"
+
+git add -A
+git status
+git commit -m "release: geostat-kit v1.0.0 — manifest-driven monorepo ops"
 ```
 
-## 2. GitHub / GitLab — ცარიელი remote
-
-1. შექმენი **ცარიელი** repo (სახელი მაგ. `geostat-kit`), README/license არ დაამატო.
-2. დააკავშირე remote:
+If first time in this folder only:
 
 ```powershell
-cd kits\geostat-kit
+git init
+git add -A
+git commit -m "release: geostat-kit v1.0.0 — manifest-driven monorepo ops"
+```
+
+## 3. Push to GitHub
+
+Replace `YOUR_USER` with your GitHub username or org.
+
+```powershell
 git branch -M main
 git remote add origin https://github.com/YOUR_USER/geostat-kit.git
 git push -u origin main
@@ -30,39 +61,50 @@ git remote add origin git@github.com:YOUR_USER/geostat-kit.git
 git push -u origin main
 ```
 
-## 3. სხვა პროექტში გამოყენება
-
-```bash
-git submodule add https://github.com/YOUR_USER/geostat-kit.git kits/geostat-kit
-```
-
-`geostat.ops.json`:
-
-```json
-"package": "kits/geostat-kit"
-```
-
-## 4. ვერსია / tag
+If `remote origin` already exists:
 
 ```powershell
-git tag -a v1.0.0 -m "geostat-kit 1.0.0"
+git remote set-url origin https://github.com/YOUR_USER/geostat-kit.git
+git push -u origin main
+```
+
+## 4. Release tag (how others pin version)
+
+```powershell
+git tag -a v1.0.0 -m "geostat-kit 1.0.0 — first public release"
 git push origin v1.0.0
 ```
 
-`VERSION` ფაილი repo root-ში უნდა ემთხვეოდეს tag-ს.
+On GitHub: **Releases** → **Draft new release** → choose tag `v1.0.0`, paste `CHANGELOG.md` section.
 
-## 5. რა **არ** უნდა ჩავიდეს პაკეტის repo-ში
+## 5. GitHub repository settings (discovery)
 
-- production `deploy.env`, API keys, SSH private keys
-- პროექტის `apps/`, `ops/config` (მხოლოდ `scaffold/` examples)
+| Field | Suggested text |
+|-------|----------------|
+| **About** | Manifest-driven ops for SaaS monorepos — compose, SSH deploy, multi-module CLI. v1.0.0 |
+| **Website** | link to `docs/INSTALL.md` on GitHub |
+| **Topics** | `devops`, `docker-compose`, `monorepo`, `spring-boot`, `vite`, `cli`, `devtools` |
 
-## 6. geostat-chat-bot-ში submodule (ოფციული)
+## 6. How others install (share this)
 
-როცა `geostat-chat-bot`-ც git repo გახდება:
+Send them:
 
 ```bash
-cd geostat-chat-bot
-git submodule add <geostat-kit-url> kits/geostat-kit
+git submodule add https://github.com/YOUR_USER/geostat-kit.git kits/geostat-kit
+cd kits/geostat-kit && git checkout v1.0.0
 ```
 
-ამ repo-ში პაკეტი ახლა ჩვეულებრივი ფოლდერია; submodule-ზე გადასვლა ცალკე commit-ს მოითხოვს.
+Doc link: `https://github.com/YOUR_USER/geostat-kit/blob/main/docs/INSTALL.md`
+
+## 7. What NOT to push
+
+- Consumer `apps/`, `ops/config` with real secrets
+- `.pytest_cache/`, `__pycache__/`
+- Personal `deploy.env` / SSH private keys
+
+`.gitignore` in this repo already excludes these.
+
+## 8. Later (optional)
+
+- npm / PyPI — **not** required; this package is **git-based** (submodule/copy), like many internal ops kits
+- Consumer monorepo submodule — separate step when you want `geostat-chat-bot` to point at this URL

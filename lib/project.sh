@@ -210,6 +210,29 @@ for mid, cfg in (m.get('modules') or {}).items():
 }
 
 # Fallback remote DEPLOY_PATH base: {server_base}/{project_slug}/{secrets_folder}
+# Credential profiles for module (file<TAB>mount<TAB>envVar per line)
+geostat_module_credentials_lines() {
+  local module_id="$1" kit
+  kit="$(geostat_kit_package_root 2>/dev/null)" || return 0
+  PYTHONPATH="${kit}${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from lib.project_context import ProjectContext
+from lib.credentials import module_credentials
+import sys
+ctx = ProjectContext.discover()
+for c in module_credentials(ctx.manifest, sys.argv[1]):
+    ev = c.get('envVar', '')
+    print(c['file'] + '\t' + c['mount'] + '\t' + ev)
+" "$module_id" 2>/dev/null
+}
+
+geostat_gcp_credentials_file() {
+  geostat_read_manifest_field adapters.gcp.credentialsFile google-credentials.json
+}
+
+geostat_gcp_container_mount() {
+  geostat_read_manifest_field adapters.gcp.containerMount "/app/$(geostat_gcp_credentials_file)"
+}
+
 geostat_default_remote_deploy_base() {
   local secrets_folder="$1" base proj
   base="$(geostat_env_value "$secrets_folder" DEPLOY_PATH "")"

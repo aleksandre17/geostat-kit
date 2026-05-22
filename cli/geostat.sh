@@ -17,6 +17,9 @@ shift || true
 
 case "$CMD" in
   init) exec bash "$PKG/toolkit/init/init.sh" "$@" ;;
+  validate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/validate_manifest.py" ;;
+  migrate) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/migrate_manifest.py" "$@" ;;
+  vscode-gen) export PYTHONPATH="$PKG${PYTHONPATH:+:$PYTHONPATH}"; exec python3 "$PKG/lib/vscode_gen.py" "$@" ;;
   compose-gen) exec python3 "$PKG/compose/build.py" ;;
   nginx-gen) exec python3 "$PKG/adapters/render_nginx.py" ;;
   stack-deploy) exec bash "$PKG/toolkit/deploy/stack-remote.sh" "$@" ;;

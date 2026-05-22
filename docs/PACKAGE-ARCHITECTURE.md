@@ -52,8 +52,11 @@ No duplicate `DEFAULTS = {...}` dicts in package code.
 
 | Field | Purpose |
 |-------|---------|
-| `features.gcpCredentials` | If `true`, CI may seed `adapters.gcp.credentialsFile` |
-| `adapters.gcp.credentialsFile` | Filename under backend secrets module |
+| `features.gcpCredentials` | If `true`, global GCP profile applies to modules without `credentials[]` |
+| `adapters.gcp.*` | `credentialsFile`, `containerMount`, `envVar` — default GCP profile |
+| `modules.<id>.credentials[]` | Per-module files: `{ file, mount, envVar }` — **multi-credential** (overrides global for that module) |
+
+Resolution: `lib/credentials.py` → `module_credentials(manifest, moduleId)`.
 
 ## Resolution API
 
@@ -91,7 +94,12 @@ Resolve-CliAlias fe
 
 ## CI & init seed
 
-`ci/prepare-integration-env.sh` and `geostat init` → **`lib/ci_prepare.py`** — loops `manifest.modules`.
+| Layer | Path | Role |
+|-------|------|------|
+| Package | `ci/prepare-integration-env.sh`, `ci/wait-health.sh` | generic seed + HTTP wait |
+| Project | `ci.integration` in manifest (e.g. `ops/ci/integration-stack.sh`) | **api** module via `lib/project.sh` — no hardcoded `apps/backend` |
+
+`geostat init` and `prepare-integration-env` → **`lib/ci_prepare.py`** — loops `manifest.modules`.
 
 ## Remote deploy path fallback
 

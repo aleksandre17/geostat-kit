@@ -60,5 +60,9 @@
     "integration": "ops/ci/integration-stack.sh",
     "prepareEnv": "kits/geostat-kit/ci/prepare-integration-env.sh",
     "waitHealth": "kits/geostat-kit/ci/wait-health.sh"
+  },
+  "vscode": {
+    "folder": ".vscode",
+    "geostatScript": "tools/geostat.ps1"
   }
 }

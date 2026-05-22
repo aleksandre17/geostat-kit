@@ -8,7 +8,15 @@ if [[ -z "${GEOSTAT_PROJECT_ROOT:-}" ]]; then
   export GEOSTAT_PROJECT_ROOT="$(cd "$PKG/../.." && pwd)"
 fi
 
-python3 - <<'PY'
+PYBIN=""
+for c in python python3 py; do
+  if command -v "$c" &>/dev/null; then
+    if [[ "$c" == py ]]; then PYBIN="py -3"; else PYBIN="$c"; fi
+    break
+  fi
+done
+[[ -n "$PYBIN" ]] || { echo "FAIL: python not found"; exit 1; }
+$PYBIN - <<'PY'
 import sys
 from pathlib import Path
 
@@ -39,8 +47,8 @@ print(f"  OK module={api_id} paths + deploy resolution")
 PY
 
 cd "$PKG"
-python3 -m pytest tests/ -q --tb=line -k "deploy or module or manifest" 2>/dev/null \
-  || python3 -m pytest tests/ -q --tb=line
+$PYBIN -m pytest tests/ -q --tb=line -k "deploy or module or manifest" 2>/dev/null \
+  || $PYBIN -m pytest tests/ -q --tb=line
 
 echo ""
 echo "  Module ops smoke passed (local)."

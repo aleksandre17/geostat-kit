@@ -285,7 +285,19 @@ if (-not $SkipComposeGen) {
     }
 }
 
-# ── 6. nginx-gen (optional) ──────────────────────────────────────
+# ── 6. VS Code Run and Debug (.vscode) ───────────────────────────
+Write-Step "VS Code launch.json + tasks.json (vscode-gen)"
+$py = Get-PythonCmd
+if ($py) {
+    $vscodePy = Join-Path $PackageRoot "lib\vscode_gen.py"
+    $env:PYTHONPATH = $PackageRoot
+    & @py $vscodePy
+    if ($LASTEXITCODE -eq 0) { Write-Host "  [OK]   .vscode (missing files only; use geostat vscode-gen --force)" -ForegroundColor Green }
+} else {
+    Write-Host "  [warn] Python not found — run: geostat vscode-gen" -ForegroundColor Yellow
+}
+
+# ── 7. nginx-gen (optional) ──────────────────────────────────────
 if (-not $SkipNginxGen) {
     $mf = Join-Path $ProjectRoot "geostat.ops.json"
     if (Test-Path $mf) {

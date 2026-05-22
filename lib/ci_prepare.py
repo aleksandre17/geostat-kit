@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from lib.credentials import module_credentials
 from lib.project_context import ProjectContext
 
 
@@ -39,25 +40,23 @@ def prepare(ctx: ProjectContext) -> None:
         if (sdir / ".env.deploy.example").is_file():
             _seed_env_example(sdir / ".env.deploy", sdir / ".env.deploy.example")
 
-    # Optional: only when project manifest enables GCP adapter
-    gcp_fn = ctx.gcp_credentials_filename()
-    if gcp_fn:
-        backend_dirs: list[Path] = []
-        from lib.modules import modules_by_role
-
-        for role in ("api", "worker"):
-            for mid in modules_by_role(ctx.manifest, role):
-                cfg = (ctx.manifest.get("modules") or {}).get(mid) or {}
-                if isinstance(cfg, dict) and cfg.get("type") == "java-boot":
-                    backend_dirs.append(ctx.secrets_module_dir(mid))
-        for bdir in backend_dirs:
-            cred = bdir / gcp_fn
-            if not cred.is_file():
-                ex = bdir / f"{gcp_fn}.example"
-                if ex.is_file():
-                    cred.write_text(ex.read_text(encoding="utf-8"), encoding="utf-8")
-                else:
-                    cred.write_text("{}\n", encoding="utf-8")
+    seeded_cred: set[tuple[Path, str]] = set()
+    for mid in (ctx.manifest.get("modules") or {}):
+        sdir = ctx.secrets_module_dir(str(mid))
+        for cred in module_credentials(ctx.manifest, str(mid)):
+            fn = cred["file"]
+            key = (sdir, fn)
+            if key in seeded_cred:
+                continue
+            seeded_cred.add(key)
+            target = sdir / fn
+            if target.is_file():
+                continue
+            ex = sdir / f"{fn}.example"
+            if ex.is_file():
+                target.write_text(ex.read_text(encoding="utf-8"), encoding="utf-8")
+            elif fn.endswith(".json"):
+                target.write_text("{}\n", encoding="utf-8")
 
     print(f"[ci] Integration env ready under {ctx.secrets_root.relative_to(ctx.root)}/")
 

@@ -184,7 +184,7 @@ $scenarios["W1-dev-bootstrap"] = @{
         "+-- $workspaceApi/",
         "    |-- gradlew, build.gradle.kts, src/, shared/, worker/",
         "    |-- src/Dockerfile.dev.remote",
-        "    |-- .env.dev, google-credentials.json",
+        "    |-- .env.dev, *credentials*.json (manifest credentials[])",
         "    |-- docker-compose.workspace.yml  (bootRun in container)",
         "    +-- volume .:/app + gradle cache"
     )

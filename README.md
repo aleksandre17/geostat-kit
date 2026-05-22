@@ -1,64 +1,87 @@
 ﻿# geostat-kit
 
-Reusable **operations package** for monorepos: env contract, compose generation, SSH deploy, manage CLI.
+**v1.0.0** — Manifest-driven **operations package** for SaaS monorepos.
 
-No application code. No production secrets. No generated compose files.
+Compose generation, SSH deploy, env contract, multi-module CLI — **no** application code, **no** production secrets in this repo.
 
-## სად ჯდება პროექტში
+| | |
+|---|---|
+| **Install** | [docs/INSTALL.md](docs/INSTALL.md) |
+| **What it is** | [docs/ADOPTION.md](docs/ADOPTION.md) |
+| **Full setup** | [docs/ADOPTION-LINE.md](docs/ADOPTION-LINE.md) |
+| **Publish** | [docs/PUBLISH-GIT.md](docs/PUBLISH-GIT.md) |
 
-**v2 layout:** `kits/geostat-kit/` (არა `packages/`).
+## Install (others download your package)
 
 ```bash
-git submodule add <repo-url> kits/geostat-kit
+# Recommended: git submodule
+git submodule add https://github.com/YOUR_USER/geostat-kit.git kits/geostat-kit
+cd kits/geostat-kit && git checkout v1.0.0
 ```
 
-`geostat.ops.json`: `"package": "kits/geostat-kit"`.
+Or clone / copy this repo into your project as `kits/geostat-kit/`.
 
-სრული ინსტრუქცია (ამ monorepo-ში): [../../docs/KITS-PACKAGE.md](../../docs/KITS-PACKAGE.md)  
-**Git-ზე ატვირთვა (standalone repo):** [docs/PUBLISH-GIT.md](docs/PUBLISH-GIT.md)  
-**Package architecture:** [docs/PACKAGE-ARCHITECTURE.md](docs/PACKAGE-ARCHITECTURE.md)
+In your **project root** (not inside the kit):
 
-## სახელმძღვანოები
+```json
+// geostat.ops.json
+{
+  "version": 2,
+  "package": "kits/geostat-kit",
+  "secrets": "ops/config",
+  ...
+}
+```
 
-| Doc | Topic |
-|-----|--------|
-| [../../docs/GEOSTAT-KIT-SETUP.md](../../docs/GEOSTAT-KIT-SETUP.md) | პალეტი + პროექტი ერთად |
-| [../../docs/GEOSTAT-INIT.md](../../docs/GEOSTAT-INIT.md) | `geostat init` |
-| [docs/ADOPTION-LINE.md](docs/ADOPTION-LINE.md) | ახალი repo — ნაბიჯ-ნაბიჯ |
-| [docs/GOLDEN-PATHS.md](docs/GOLDEN-PATHS.md) | frontend golden paths |
-| [docs/GOLDEN-PATHS-BACKEND.md](docs/GOLDEN-PATHS-BACKEND.md) | backend golden paths |
+```powershell
+# From your project root — add tools/geostat.ps1 shim (see docs/INSTALL.md)
+.\tools\geostat.ps1 init
+.\tools\geostat.ps1 validate
+```
 
-## Layout (პაკეტის შიგნით)
+Details: **[docs/INSTALL.md](docs/INSTALL.md)**
+
+## Features (1.0.0)
+
+- `geostat.ops.json` — modules, roles (`ui`, `api`, `worker`), paths, CI, adapters
+- Drivers: `java-boot` (Spring/Gradle), `node-vite` (Vite)
+- `geostat validate` · `migrate` · `vscode-gen` · `stack` · remote deploy / `dev watch`
+- N-module CLI: `geostat mod <moduleId> …`
+- See [CHANGELOG.md](CHANGELOG.md)
+
+## Layout
 
 ```text
-kits/geostat-kit/
-├── lib/                 # env, manifest, driver_api.py
-├── compose/             # catalog → docker-compose engine
-├── adapters/            # nginx CSP render
-├── drivers/             # java-boot | node-vite | …
-├── toolkit/             # deploy, stack, init, …
-├── cli/                 # geostat router
-├── scaffold/            # project tree templates (v2: apps/, ops/)
-├── ci/
+geostat-kit/          ← this repository (standalone package)
+├── lib/              # manifest resolution API
+├── drivers/          # stack-type plugins
+├── toolkit/          # deploy, stack, init
+├── compose/          # catalog → docker-compose generator
+├── cli/              # geostat entry
+├── scaffold/         # templates for new projects
+├── ci/               # generic CI helpers
+├── scripts/          # verify / smoke
+├── tests/
 └── docs/
 ```
 
-## Quick start (ახალი პროექტი)
-
-1. ჩააყენე პაკეტი → `kits/geostat-kit/` ([KITS-PACKAGE.md](../../docs/KITS-PACKAGE.md))
-2. `.\tools\geostat.ps1 init`
-3. [ADOPTION-LINE.md](docs/ADOPTION-LINE.md) §4–§11
-
-## Tests
+## Tests (package maintainers)
 
 ```powershell
-cd kits\geostat-kit
+cd geostat-kit
 $env:PYTHONPATH = (Get-Location).Path
-py -3 -m pytest tests -q
+python -m pytest tests -q
 ```
 
-ან: `bash kits/geostat-kit/tests/run-kit-tests.sh`
+```powershell
+.\scripts\dev-modes-verify.ps1 -SkipDocker
+```
 
 ## Version
 
-[VERSION](VERSION)
+[VERSION](VERSION) — current: **1.0.0**  
+Release tag: **`v1.0.0`**
+
+## License
+
+Add your license file before public publish (MIT, Apache-2.0, or proprietary). This repo ships without `LICENSE` until you choose one on GitHub.

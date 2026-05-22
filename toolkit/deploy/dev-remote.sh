@@ -89,10 +89,15 @@ dev_publish_workspace_env() {
     return 1
   }
   scp "$env_src" "$SERVER:$rp/.env.dev" || return 1
-  local cred="$SECRETS_DIR/google-credentials.json"
-  if [[ -f "$cred" ]]; then
-    scp "$cred" "$SERVER:$rp/google-credentials.json" || return 1
-  fi
+  local line cred_file mount remote_name
+  while IFS=$'\t' read -r cred_file mount _env_var; do
+    [[ -n "$cred_file" ]] || continue
+    cred="$SECRETS_DIR/$cred_file"
+    if [[ -f "$cred" ]]; then
+      remote_name="$(basename "${mount:-$cred_file}")"
+      scp "$cred" "$SERVER:$rp/$remote_name" || return 1
+    fi
+  done < <(geostat_module_credentials_lines "$s")
 }
 
 dev_gradle_task_for() {
@@ -160,6 +165,14 @@ dev_ensure_docker_network() {
   ssh -n "$SERVER" "docker network inspect '$net' >/dev/null 2>&1 || docker network create '$net'" || return 1
 }
 
+dev_compose_credential_env_yaml() {
+  local module_id="$1" line cred_file mount env_var
+  while IFS=$'\t' read -r cred_file mount env_var; do
+    [[ -n "$env_var" ]] || continue
+    printf '      %s: %s\n' "$env_var" "$mount"
+  done < <(geostat_module_credentials_lines "$module_id")
+}
+
 dev_write_workspace_compose() {
   local s="$1" rp df cmd port_var health_path cname def_port net
   rp="$(dev_workspace_path_for "$s")"
@@ -190,7 +203,7 @@ services:
       - .env.dev
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      GOOGLE_APPLICATION_CREDENTIALS: /app/google-credentials.json
+$(dev_compose_credential_env_yaml "$s")
       GRADLE_USER_HOME: /home/gradle/.gradle
     networks:
       - ${net}

@@ -52,7 +52,7 @@ function Show-Help {
 
 
 
-    init | stack | stack-deploy | compose-gen | nginx-gen | infra | layout
+    init | validate | migrate | vscode-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout
 
     mod <moduleId> deploy|manage|compose|check|modules  …
 
@@ -223,6 +223,29 @@ $globalCommands = @{
 
         exit $LASTEXITCODE
 
+    }
+
+    "validate" = {
+        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+        $env:PYTHONPATH = "$PackageRoot"
+        & $py (Join-Path $PackageRoot "lib\validate_manifest.py")
+        exit $LASTEXITCODE
+    }
+
+    "migrate" = {
+        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+        $env:PYTHONPATH = "$PackageRoot"
+        & $py (Join-Path $PackageRoot "lib\migrate_manifest.py") @Args
+        exit $LASTEXITCODE
+    }
+
+    "vscode-gen" = {
+        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+        $env:PYTHONPATH = "$PackageRoot"
+        $vargs = @()
+        if ($Args -contains "--force") { $vargs += "--force" }
+        & $py (Join-Path $PackageRoot "lib\vscode_gen.py") @vargs
+        exit $LASTEXITCODE
     }
 
     "compose-gen" = {

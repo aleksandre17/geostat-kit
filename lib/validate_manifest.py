@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Validate geostat.ops.json — schema + package boundary checks."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+from lib.credentials import all_module_credential_files, module_credentials
+from lib.project_context import ProjectContext, load_manifest
+
+
+def _load_schema(pkg_root: Path) -> dict[str, Any]:
+    path = pkg_root / "manifest.schema.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _validate_jsonschema(instance: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+    try:
+        import jsonschema  # type: ignore
+    except ImportError:
+        return []
+    errs: list[str] = []
+    validator = jsonschema.Draft7Validator(schema)
+    for e in sorted(validator.iter_errors(instance), key=lambda x: list(x.path)):
+        loc = ".".join(str(p) for p in e.path) or "(root)"
+        errs.append(f"{loc}: {e.message}")
+    return errs
+
+
+def _validate_required(instance: dict[str, Any]) -> list[str]:
+    errs: list[str] = []
+    if instance.get("version", 0) < 2:
+        errs.append("version: must be >= 2 (run: geostat migrate)")
+    for key in ("package", "secrets", "compose", "modules"):
+        if key not in instance:
+            errs.append(f"(root): missing required field '{key}'")
+    compose = instance.get("compose")
+    if isinstance(compose, dict) and "catalog" not in compose:
+        errs.append("compose: missing catalog")
+    mods = instance.get("modules")
+    if not isinstance(mods, dict) or not mods:
+        errs.append("modules: at least one module required")
+        return errs
+    for mid, cfg in mods.items():
+        if not isinstance(cfg, dict):
+            errs.append(f"modules.{mid}: must be object")
+            continue
+        for req in ("type", "path", "secretsModule", "role"):
+            if req not in cfg:
+                errs.append(f"modules.{mid}: missing '{req}'")
+        creds = cfg.get("credentials")
+        if creds is not None:
+            if not isinstance(creds, list):
+                errs.append(f"modules.{mid}.credentials: must be array")
+            else:
+                for i, item in enumerate(creds):
+                    if not isinstance(item, dict) or not item.get("file"):
+                        errs.append(f"modules.{mid}.credentials[{i}]: requires 'file'")
+    adapters = instance.get("adapters")
+    if isinstance(adapters, dict):
+        gcp = adapters.get("gcp")
+        if gcp is not None and not isinstance(gcp, dict):
+            errs.append("adapters.gcp: must be object")
+        elif isinstance(gcp, dict) and gcp.get("enabled") is not False:
+            if gcp.get("credentialsFile") and not isinstance(gcp["credentialsFile"], str):
+                errs.append("adapters.gcp.credentialsFile: must be string")
+        nginx = adapters.get("nginx")
+        if nginx is not None and not isinstance(nginx, dict):
+            errs.append("adapters.nginx: must be object")
+    return errs
+
+
+def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str]:
+    errs: list[str] = []
+    warnings: list[str] = []
+    root = ctx.root
+    pkg = ctx.package_root
+    if not pkg.is_dir():
+        errs.append(f"package: path not found: {pkg.relative_to(root)}")
+
+    for mid, cfg in (ctx.manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        typ = cfg.get("type")
+        if typ and typ not in registry:
+            errs.append(f"modules.{mid}.type: unknown driver '{typ}'")
+        rel = cfg.get("path")
+        if rel and not (root / str(rel)).is_dir():
+            warnings.append(f"modules.{mid}.path: directory missing ({rel})")
+        for cred in module_credentials(ctx.manifest, str(mid)):
+            fn = cred["file"]
+            if ".." in fn or fn.startswith("/"):
+                errs.append(f"modules.{mid}.credentials: invalid file '{fn}'")
+
+    cat = ctx.catalog_path
+    if not cat.is_file():
+        warnings.append(f"compose.catalog: missing ({cat.relative_to(root)})")
+
+    ci = ctx.manifest.get("ci") or {}
+    if isinstance(ci, dict):
+        for key in ("integration", "prepareEnv", "waitHealth"):
+            rel = ci.get(key)
+            if rel and not (root / str(rel)).is_file():
+                warnings.append(f"ci.{key}: file missing ({rel})")
+
+    api_ids = ctx.module_ids_for_role("api")
+    if len(api_ids) > 1:
+        warnings.append(
+            f"modules: multiple role=api ({', '.join(api_ids)}); CI uses index 0 — set explicit ci module if needed"
+        )
+
+    seen_sm: dict[str, str] = {}
+    for mid, cfg in (ctx.manifest.get("modules") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        sm = str(cfg.get("secretsModule", mid))
+        if sm in seen_sm and seen_sm[sm] != mid:
+            warnings.append(f"modules: duplicate secretsModule '{sm}' ({seen_sm[sm]}, {mid})")
+        seen_sm[sm] = str(mid)
+
+    all_creds = all_module_credential_files(ctx.manifest)
+    for mid, items in all_creds.items():
+        files = [c["file"] for c in items]
+        if len(files) != len(set(files)):
+            errs.append(f"modules.{mid}.credentials: duplicate file names")
+
+    return errs, warnings
+
+
+def validate_manifest(
+    root: Path | None = None, *, pkg_root: Path | None = None
+) -> tuple[list[str], list[str]]:
+    ctx = ProjectContext.discover(root)
+    pkg = pkg_root or ctx.package_root
+    schema = _load_schema(pkg)
+    registry = json.loads((pkg / "drivers" / "registry.json").read_text(encoding="utf-8"))
+
+    errs = _validate_required(ctx.manifest)
+    errs.extend(_validate_jsonschema(ctx.manifest, schema))
+    proj_errs, warnings = _validate_project(ctx, registry)
+    errs.extend(proj_errs)
+    return errs, warnings
+
+
+def main() -> int:
+    try:
+        errs, warnings = validate_manifest()
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    for w in warnings:
+        print(f"WARN: {w}")
+    if errs:
+        for e in errs:
+            print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    print("[validate] geostat.ops.json OK")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

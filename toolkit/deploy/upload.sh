@@ -36,6 +36,16 @@ upload_service() {
     "
   fi
 
+  local cred_file
+  while IFS=$'\t' read -r cred_file _mount _ev; do
+    [[ -n "$cred_file" ]] || continue
+    f="$SECRETS_DIR/$cred_file"
+    if [[ -f "$f" ]]; then
+      scp "$f" "$SERVER:$rp/$(basename "$cred_file")" 2>/dev/null
+      echo "  [cred] $(basename "$cred_file") (manifest)"
+    fi
+  done < <(geostat_module_credentials_lines "$s")
+
   for pattern in $CRED_PATTERNS; do
     for f in "$cred_base/"$pattern; do
       [ -f "$f" ] || continue

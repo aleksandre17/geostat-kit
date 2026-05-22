@@ -17,6 +17,8 @@ HARDCODED_SECRET_SUBDIR = re.compile(
     r"ops/config/(?:frontend|backend)(?!['\"]?\s*\+)",
 )
 
+HARDCODED_GCP_FILE = re.compile(r"google-credentials\.json")
+
 SCAN_DIRS = ("toolkit", "drivers", "lib", "cli", "compose", "adapters", "scripts")
 def _scan_file(path: Path) -> list[str]:
     if path.suffix not in {".py", ".sh", ".ps1"}:
@@ -35,6 +37,9 @@ def _scan_file(path: Path) -> list[str]:
         if "Get-ModuleEnvPathLabels" in text or "Get-ScaffoldManifestField" in text:
             return issues
         issues.append(f"{rel}: hardcoded ops/config/frontend|backend")
+    if "toolkit/deploy/" in rel and HARDCODED_GCP_FILE.search(text):
+        if "geostat_module_credentials" not in text and "geostat_gcp_" not in text:
+            issues.append(f"{rel}: hardcoded google-credentials.json (use manifest credentials)")
     return issues
 
 

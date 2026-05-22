@@ -20,6 +20,8 @@ def test_gcp_optional_by_feature(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     assert ctx.feature_enabled("gcpCredentials") is True
     assert ctx.gcp_credentials_filename() == "google-credentials.json"
+    backend_creds = ctx.module_credentials_list("backend")
+    assert backend_creds and backend_creds[0]["file"] == "google-credentials.json"
 
     off = {**manifest, "features": {"gcpCredentials": False}}
     ctx2 = ProjectContext(root=repo_root, manifest=off)

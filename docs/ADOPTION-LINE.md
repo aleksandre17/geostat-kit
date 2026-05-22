@@ -119,7 +119,7 @@ git submodule add <repo-url> kits/geostat-kit
 | `compose.catalog` | `"ops/compose/catalog.json"` |
 | `compose.syncModules` | `"apps/backend/ops.modules"` — მხოლოდ `java-boot` multi-module-ისთვის |
 | `stack.composeDir` | `"ops/compose/stack"` — full-stack local compose |
-| `cli.aliases` | `{ "fe": "frontend", "be": "backend" }` — მოკლე ბრძანებები |
+| `cli.aliases` | `{ "fe": "frontend", "be": "backend" }` —  ბრძანებები |
 | `stackDeploy.steps` | remote full-stack deploy ნაბიჯები (იხ. §12) |
 | `modules.<id>.type` | driver id: `java-boot`, `node-vite`, … ([registry.json](../drivers/registry.json)) |
 | `modules.<id>.path` | ფოლდერი root-თან: `backend`, `frontend` |
@@ -572,4 +572,4 @@ drivers/_template/  →  drivers/go-api/   (სახელი = registry key)
 
 ---
 
-**ვერსია პაკეტი:** [VERSION](../VERSION) · მოკლე ADOPT: [ADOPT.md](ADOPT.md) → ეს ფაილი არის სრული ხაზი.
+**ვერსია პაკეტი:** [VERSION](../VERSION) ·  ADOPT: [ADOPT.md](ADOPT.md) → ეს ფაილი არის სრული ხაზი.

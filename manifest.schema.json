@@ -4,7 +4,7 @@
   "type": "object",
   "required": ["version", "package", "secrets", "compose", "modules"],
   "properties": {
-    "version": { "type": "integer", "minimum": 1 },
+    "version": { "type": "integer", "minimum": 2 },
     "package": {
       "type": "string",
       "description": "Relative path from project root to geostat-kit package"
@@ -72,20 +72,98 @@
           },
           "path": { "type": "string" },
           "secretsModule": { "type": "string" },
+          "credentials": {
+            "type": "array",
+            "description": "Credential files under secretsModule (overrides global adapters.gcp for this module)",
+            "items": {
+              "type": "object",
+              "required": ["file"],
+              "properties": {
+                "file": { "type": "string" },
+                "mount": { "type": "string" },
+                "envVar": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
           "scripts": {
             "type": "string",
             "description": "Deprecated — use package drivers; optional wrapper path only"
           },
-          "target": { "type": "string" }
+          "target": { "type": "string" },
+          "debug": {
+            "type": "object",
+            "description": "VS Code Run and Debug (optional; java-boot auto-detects *Application.java)",
+            "properties": {
+              "label": { "type": "string" },
+              "npmScript": { "type": "string" },
+              "envFile": { "type": "string" },
+              "mainClass": { "type": "string" },
+              "projectName": { "type": "string" },
+              "java": {
+                "type": "object",
+                "properties": {
+                  "mainClass": { "type": "string" },
+                  "projectName": { "type": "string" }
+                }
+              }
+            },
+            "additionalProperties": true
+          }
         }
       }
+    },
+    "vscode": {
+      "type": "object",
+      "properties": {
+        "folder": { "type": "string" },
+        "geostatScript": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "features": {
       "type": "object",
       "description": "Optional project capabilities (package reads; defaults off in scaffold)",
       "additionalProperties": { "type": "boolean" }
     },
-    "adapters": { "type": "object" },
-    "ci": { "type": "object" }
+    "adapters": {
+      "type": "object",
+      "properties": {
+        "gcp": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "credentialsFile": { "type": "string" },
+            "containerMount": { "type": "string" },
+            "envVar": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "nginx": {
+          "type": "object",
+          "properties": {
+            "template": { "type": "string" },
+            "output": { "type": "string" },
+            "envExample": { "type": "string" },
+            "env": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "embed": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "integration": { "type": "string" },
+        "prepareEnv": { "type": "string" },
+        "waitHealth": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
   }
 }
