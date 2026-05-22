@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "geostat.ops project manifest",
+  "type": "object",
+  "required": ["version", "package", "secrets", "compose", "modules"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "package": {
+      "type": "string",
+      "description": "Relative path from project root to geostat-kit package"
+    },
+    "secrets": { "type": "string" },
+    "compose": {
+      "type": "object",
+      "required": ["catalog"],
+      "properties": {
+        "catalog": { "type": "string" },
+        "syncModules": { "type": "string" }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "properties": {
+        "composeDir": { "type": "string" }
+      }
+    },
+    "cli": {
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Shortcut → modules.<id> (e.g. fe → frontend, be → backend)"
+        }
+      }
+    },
+    "stackDeploy": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["module", "command"],
+            "properties": {
+              "module": { "type": "string" },
+              "command": { "type": "string" },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Placeholders: {environment} dev|prod, {env} same"
+              }
+            }
+          }
+        }
+      }
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "path", "secretsModule"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Driver id from drivers/registry.json (e.g. java-boot, node-vite)"
+          },
+          "path": { "type": "string" },
+          "secretsModule": { "type": "string" },
+          "scripts": {
+            "type": "string",
+            "description": "Deprecated — use package drivers; optional wrapper path only"
+          },
+          "target": { "type": "string" }
+        }
+      }
+    },
+    "adapters": { "type": "object" },
+    "ci": { "type": "object" }
+  }
+}

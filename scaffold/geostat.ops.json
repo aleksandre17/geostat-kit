@@ -1,0 +1,55 @@
+{
+  "$schema": "./kits/geostat-kit/manifest.schema.json",
+  "version": 2,
+  "package": "kits/geostat-kit",
+  "secrets": "ops/config",
+  "compose": {
+    "catalog": "ops/compose/catalog.json",
+    "syncModules": "apps/backend/ops.modules"
+  },
+  "stack": {
+    "composeDir": "ops/compose/stack"
+  },
+  "cli": {
+    "aliases": {
+      "fe": "frontend",
+      "be": "backend"
+    }
+  },
+  "stackDeploy": {
+    "steps": [
+      { "module": "backend", "command": "deploy", "args": ["all"] },
+      { "module": "frontend", "command": "deploy", "args": ["dist", "-Environment", "{environment}"] }
+    ]
+  },
+  "modules": {
+    "backend": {
+      "type": "java-boot",
+      "path": "apps/backend",
+      "secretsModule": "backend",
+      "target": "backend"
+    },
+    "frontend": {
+      "type": "node-vite",
+      "path": "apps/frontend",
+      "secretsModule": "frontend",
+      "target": "frontend"
+    }
+  },
+  "adapters": {
+    "nginx": {
+      "template": "apps/frontend/nginx.conf.template",
+      "output": "apps/frontend/nginx.conf",
+      "envExample": "ops/config/frontend/nginx.env.example",
+      "env": "ops/config/frontend/nginx.env"
+    },
+    "embed": {
+      "envExample": "ops/config/frontend/embed.env.example"
+    }
+  },
+  "ci": {
+    "integration": "ops/ci/integration-stack.sh",
+    "prepareEnv": "kits/geostat-kit/ci/prepare-integration-env.sh",
+    "waitHealth": "kits/geostat-kit/ci/wait-health.sh"
+  }
+}

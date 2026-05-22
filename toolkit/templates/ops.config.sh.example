@@ -1,0 +1,7 @@
+# Copy to <module>/ops.config.sh and edit
+OPS_SECRETS_MODULE="backend"
+# Leave empty to use secrets/deploy.env DEPLOY_PROJECT or repo folder name
+OPS_PROJECT_NAME=""
+OPS_TARGET_DEFAULT="backend"
+VERSIONS_KEEP=5
+HEALTH_RETRIES=24
