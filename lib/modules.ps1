@@ -1,13 +1,15 @@
 # N-module manifest helpers (roles, types, layout routing)
 
 . (Join-Path $PSScriptRoot "project.ps1")
+. (Join-Path $PSScriptRoot "geostat-python.ps1")
 . (Join-Path $PSScriptRoot "drivers.ps1")
 
 function Invoke-GeostatModulesApi {
     param([string[]]$ApiArgs)
-    $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+    $pyArgs = Get-GeostatPythonArgs
+    if (-not $pyArgs) { throw "Python not found (tried py -3, python3, python)" }
     $script = Join-Path (Get-OpsPackageRoot) "lib\modules_cli.py"
-    & $py $script @ApiArgs
+    Invoke-GeostatPythonExe $pyArgs $script @ApiArgs
 }
 
 function Get-ModuleRole {

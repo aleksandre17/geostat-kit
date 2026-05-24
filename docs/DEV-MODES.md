@@ -11,7 +11,8 @@ Run and Debug (`launch.json`) — იხ. [LOCAL-DEBUG.md](LOCAL-DEBUG.md). Gold
 |--------|-------------|--------|------------------------|
 | **① ლოკალური, host** | შენი Windows/Mac — Node/Java პირდაპირ | **არა** | **კი** — `npm run dev`, `Spring Boot`, `Full stack (local)` |
 | **② ლოკალური Docker** | იგივე მანქანა, `localhost` | **კი** | Task / launch: `geostat stack`, `fe/be compose up` |
-| **③ Remote + Docker** | Linux სერვერი (SSH) | **კი** (სერვერზე) | **არა** — ტერმინალი: `geostat fe/be dev watch` |
+| **③ Remote + Docker** | Linux სერვერი (SSH) | **კი** (სერვერზე) | **არა** — `geostat fe/be dev watch` |
+| **④ Hybrid** | Apps host-ზე, infra remote + tunnel | **კი** (remote) | **კი** — `Hybrid: infra tunnel + API + UI`, `geostat hybrid boot` |
 
 ---
 
@@ -93,6 +94,25 @@ cd apps/backend; .\gradlew bootRun
 - SSH: `ops/config/ssh/`
 
 დეტალი: [REMOTE-DEV-DOCKERFILE-FLOW.md](REMOTE-DEV-DOCKERFILE-FLOW.md), [GOLDEN-PATHS.md](GOLDEN-PATHS.md), პროექტი `docs/DEV-REMOTE.md`, `docs/FE-WATCH.md`.
+
+---
+
+## ④ Hybrid — apps ლოკალურად (Windows), infra remote Linux
+
+**Apps** — `gradlew bootRun` / `npm run dev` შენს მანქანაზე; **Postgres / Redis / Qdrant / RabbitMQ** — მხოლოდ Linux სერვერზე Docker-ით; კავშირი **SSH tunnel** → `localhost`.
+
+| ნაბიჯი | ბრძანება |
+|--------|----------|
+| 1. Infra remote | `geostat infra remote up` |
+| 2. Tunnel | `geostat infra tunnel` (ან VS Code compound preLaunch) |
+| 3. Apps | `geostat hybrid boot <alias>` ან `geostat <alias> run` |
+| 4. F5 compound | Run and Debug → **Hybrid: infra tunnel + API + UI** |
+
+**Env:** `ops/config/<module>/.env.dev` — `INFRA_HOST=127.0.0.1`, peer URLs (`RETRIEVAL_BASE_URL`, …). Spring profile — manifest `modules.*.hybrid.springProfiles`.
+
+**არ აურიო:** legacy `apps/backend/worker` — worker = `ingestion-service`.
+
+სრული არქიტექტურა: consumer [HYBRID-DEV-ARCHITECTURE.md](../../../docs/plan/HYBRID-DEV-ARCHITECTURE.md).
 
 ---
 

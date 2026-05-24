@@ -1,6 +1,23 @@
 #!/bin/bash
 # Project manifest (geostat.ops.json) — package boundary resolution
 
+geostat_python() {
+  if command -v python3 &>/dev/null; then
+    if python3 -c "import sys" &>/dev/null 2>&1; then
+      python3 "$@"
+      return $?
+    fi
+  fi
+  if command -v py &>/dev/null; then
+    py -3 "$@"
+  elif command -v python &>/dev/null; then
+    python "$@"
+  else
+    echo "  ERROR: python not found (need python3, py, or python)" >&2
+    return 127
+  fi
+}
+
 _geostat_manifest_file() {
   local root="${GEOSTAT_PROJECT_ROOT:-}"
   if [[ -z "$root" ]]; then
@@ -21,15 +38,26 @@ _geostat_legacy_discovery() {
   [[ "${GEOSTAT_LEGACY_ROOT_DISCOVERY:-}" =~ ^(1|true|yes|on)$ ]]
 }
 
+# Git Bash / MSYS: Windows drive paths break PYTHONPATH in inline env (\U escapes).
+geostat_normalize_unix_path() {
+  local p="${1:-}"
+  [[ -n "$p" ]] || return 1
+  if [[ "$p" =~ ^[A-Za-z]:[/\\] ]]; then
+    (cd "$p" && pwd) || echo "$p"
+  else
+    echo "$p"
+  fi
+}
+
 geostat_find_project_root() {
   if [[ -n "${GEOSTAT_PROJECT_ROOT:-}" ]]; then
-    echo "$GEOSTAT_PROJECT_ROOT"
+    geostat_normalize_unix_path "$GEOSTAT_PROJECT_ROOT"
     return 0
   fi
   local dir="${1:-$(pwd)}" mf
   while [[ -n "$dir" && "$dir" != "/" ]]; do
     if [[ -f "$dir/geostat.ops.json" ]]; then
-      echo "$dir"
+      geostat_normalize_unix_path "$dir"
       return 0
     fi
     dir="$(dirname "$dir")"
@@ -39,7 +67,7 @@ geostat_find_project_root() {
     while [[ -n "$dir" && "$dir" != "/" ]]; do
       if [[ -d "$dir/secrets" || -d "$dir/ops/config" ]]; then
         if [[ -d "$dir/kits/geostat-kit" || -d "$dir/packages/geostat-kit" ]]; then
-          echo "$dir"
+          geostat_normalize_unix_path "$dir"
           return 0
         fi
       fi
@@ -52,7 +80,7 @@ geostat_find_project_root() {
 geostat_read_manifest_field() {
   local field="$1" default="${2:-}"
   if [[ -z "$default" && -n "${GEOSTAT_KIT_ROOT:-}" ]]; then
-    default="$(PYTHONPATH="${GEOSTAT_KIT_ROOT}${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+    default="$(PYTHONPATH="${GEOSTAT_KIT_ROOT}${PYTHONPATH:+:$PYTHONPATH}" geostat_python -c "
 from lib.manifest_defaults import default_field
 import sys
 print(default_field(sys.argv[1]))
@@ -61,7 +89,7 @@ print(default_field(sys.argv[1]))
   local mf root
   mf="$(_geostat_manifest_file 2>/dev/null)" || { echo "$default"; return; }
   root="$(dirname "$mf")"
-  python3 -c "
+  geostat_python -c "
 import json, sys
 p = sys.argv[1]
 f = sys.argv[2]
@@ -146,7 +174,7 @@ geostat_stack_compose_dir() {
 geostat_manifest_feature_enabled() {
   local name="$1" mf
   mf="$(_geostat_manifest_file 2>/dev/null)" || { echo "false"; return; }
-  python3 -c "
+  geostat_python -c "
 import json, sys
 m = json.load(open(sys.argv[1], encoding='utf-8'))
 f = (m.get('features') or {}).get(sys.argv[2])
@@ -158,7 +186,7 @@ print('true' if f is True else 'false')
 geostat_module_id_for_role() {
   local role="$1" idx="${2:-0}" mf mid
   mf="$(_geostat_manifest_file 2>/dev/null)" || return 1
-  mapfile -t _GEOSTAT_ROLE_IDS < <(python3 -c "
+  mapfile -t _GEOSTAT_ROLE_IDS < <(geostat_python -c "
 import json, sys
 m = json.load(open(sys.argv[1], encoding='utf-8'))
 role = sys.argv[2]
@@ -176,26 +204,29 @@ for mid, cfg in (m.get('modules') or {}).items():
 print('\n'.join(out))
 " "$mf" "$role" 2>/dev/null)
   mid="${_GEOSTAT_ROLE_IDS[$idx]:-}"
+  mid="${mid//$'\r'/}"
   [[ -n "$mid" ]] && echo "$mid"
 }
 
 geostat_module_id_for_type() {
-  local driver_type="$1" mf
+  local driver_type="$1" mf mid
   mf="$(_geostat_manifest_file 2>/dev/null)" || return 1
-  python3 -c "
+  mid="$(geostat_python -c "
 import json, sys
 m = json.load(open(sys.argv[1], encoding='utf-8'))
 for mid, cfg in (m.get('modules') or {}).items():
     if isinstance(cfg, dict) and cfg.get('type') == sys.argv[2]:
         print(mid)
         break
-" "$mf" "$driver_type" 2>/dev/null
+" "$mf" "$driver_type" 2>/dev/null)"
+  mid="${mid//$'\r'/}"
+  [[ -n "$mid" ]] && echo "$mid"
 }
 
 geostat_list_secrets_module_folders() {
   local mf
   mf="$(_geostat_manifest_file 2>/dev/null)" || return 0
-  python3 -c "
+  geostat_python -c "
 import json, sys
 m = json.load(open(sys.argv[1], encoding='utf-8'))
 seen = []
@@ -214,7 +245,7 @@ for mid, cfg in (m.get('modules') or {}).items():
 geostat_module_credentials_lines() {
   local module_id="$1" kit
   kit="$(geostat_kit_package_root 2>/dev/null)" || return 0
-  PYTHONPATH="${kit}${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+  PYTHONPATH="${kit}${PYTHONPATH:+:$PYTHONPATH}" geostat_python -c "
 from lib.project_context import ProjectContext
 from lib.credentials import module_credentials
 import sys

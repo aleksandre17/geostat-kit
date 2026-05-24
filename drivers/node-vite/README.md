@@ -8,6 +8,7 @@ Stack-agnostic **single-page app** module driver: **Vite (React)**, **Angular CL
 |---------|---------|
 | `deploy local\|dist\|remote\|sync\|watch` | Artifact / compose deploy (`watch` = static dist loop) |
 | `dev bootstrap\|sync\|watch\|restart` | Windows → Linux **source** sync (rsync), no `dist` build |
+| `run` | Local `npm run <script>` + secrets `.env.dev` (manifest `debug.npmScript` / `hybrid`) |
 
 **`deploy watch` vs `dev watch`:** [docs/FE-WATCH.md](../../../docs/FE-WATCH.md)
 

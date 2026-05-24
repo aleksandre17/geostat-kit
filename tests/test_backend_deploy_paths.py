@@ -5,7 +5,9 @@ import pytest
 
 from lib.deploy_paths import (
     backend_deploy_path_candidates,
+    deploy_path_summary,
     resolve_backend_deploy_path,
+    resolve_deploy_path_base,
 )
 
 BASE = "/home/example/my-app/backend"
@@ -64,3 +66,54 @@ def test_multi_module_paths(container: str):
     )
     assert p.endswith(container)
     assert "/runtime/" in p
+
+
+class TestDeployPathBaseInherit:
+    BACKEND_BASE = "/home/administrator/geostat/backend"
+
+    def test_worker_inherits_backend_base(self):
+        assert (
+            resolve_deploy_path_base(
+                module_deploy_path=None,
+                base_module_deploy_path=self.BACKEND_BASE,
+            )
+            == self.BACKEND_BASE
+        )
+
+    def test_explicit_module_base_wins(self):
+        assert (
+            resolve_deploy_path_base(
+                module_deploy_path="/custom/path",
+                base_module_deploy_path=self.BACKEND_BASE,
+            )
+            == "/custom/path"
+        )
+
+    def test_retrieval_runtime_from_inherited_base(self):
+        base = resolve_deploy_path_base(
+            module_deploy_path=None,
+            base_module_deploy_path=self.BACKEND_BASE,
+        )
+        path = resolve_backend_deploy_path(
+            base=base,
+            container_name="geostat-chat-ai-retrieval",
+            kind="runtime",
+            layout="structured",
+        )
+        assert path == f"{self.BACKEND_BASE}/runtime/geostat-chat-ai-retrieval"
+
+
+class TestDeployPathSummary:
+    def test_structured(self):
+        assert (
+            deploy_path_summary(base=BASE, layout="structured")
+            == f"{BASE}/runtime/<container>/"
+        )
+
+    def test_missing_base_hint(self):
+        s = deploy_path_summary(
+            base=None,
+            server_base="/home/administrator",
+            project="geostat",
+        )
+        assert "backend/runtime/<container>/" in s

@@ -24,6 +24,8 @@
 
 **Compound:** `Full stack (local)` — API + UI ერთად (Run and Debug → compound).
 
+**Hybrid ④:** `Hybrid: infra tunnel + API + UI` — `preLaunchTask` = SSH tunnel (`stack.infra.services` manifest-ში); საჭიროა `ops/config/deploy.env` + `ops/config/infra/.env.dev`. Remote infra: `geostat infra remote up` (task ან ხელით).
+
 ## Manifest (ოფციური დეტალები)
 
 ```json

@@ -66,11 +66,36 @@ def primary_api_module_id(manifest: dict[str, Any], module_ids: list[str] | None
     mods = manifest.get("modules") or {}
     if "backend" in ids and isinstance(mods.get("backend"), dict):
         return "backend"
+    if "chat-api" in ids and isinstance(mods.get("chat-api"), dict):
+        return "chat-api"
     for mid in ids:
         cfg = mods.get(mid)
         if isinstance(cfg, dict) and cfg.get("role") == "api":
             return mid
     return None
+
+
+def embedded_worker_enabled(
+    manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None
+) -> bool:
+    """P0-kit-13: manifest modules.<primary-api>.compose.embeddedWorker replaces catalog features.worker."""
+    primary = primary_api_module_id(manifest)
+    if primary:
+        cfg = (manifest.get("modules") or {}).get(primary) or {}
+        compose = cfg.get("compose") if isinstance(cfg, dict) else None
+        if isinstance(compose, dict) and "embeddedWorker" in compose:
+            return bool(compose.get("embeddedWorker"))
+    catalog = catalog_features if isinstance(catalog_features, dict) else {}
+    return bool(catalog.get("worker", False))
+
+
+def effective_compose_features(
+    manifest: dict[str, Any], catalog_features: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Merge catalog features with manifest-driven embedded worker flag."""
+    catalog = dict(catalog_features) if isinstance(catalog_features, dict) else {}
+    catalog["worker"] = embedded_worker_enabled(manifest, catalog_features)
+    return catalog
 
 
 def primary_worker_module_id(manifest: dict[str, Any], module_ids: list[str] | None = None) -> str | None:

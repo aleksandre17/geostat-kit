@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # geostat-kit package — env & naming (no application logic)
 # Source: geostat_kit_package_root/lib/env.sh (after project.sh)
 

@@ -17,7 +17,7 @@ function Get-ComposeServicesFromFile {
             $args += @("config", "--services")
             $names = & docker @args 2>$null
             if ($LASTEXITCODE -eq 0 -and $names) {
-                return $names | ForEach-Object {
+                return @($names | ForEach-Object {
                     $n = $_.Trim()
                     [PSCustomObject]@{
                         Name          = $n
@@ -25,7 +25,7 @@ function Get-ComposeServicesFromFile {
                         Context       = '.'
                         Dockerfile    = 'Dockerfile'
                     }
-                }
+                })
             }
         } finally { Pop-Location }
     }
@@ -33,5 +33,5 @@ function Get-ComposeServicesFromFile {
     # Fallback: legacy parser from ops toolkit
     $prev = $OpsComposeFile
     $script:OpsComposeFile = $ComposeFile
-    try { return Get-DockerServices } finally { $script:OpsComposeFile = $prev }
+    try { return @(Get-DockerServices) } finally { $script:OpsComposeFile = $prev }
 }

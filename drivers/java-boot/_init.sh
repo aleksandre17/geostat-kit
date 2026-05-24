@@ -29,7 +29,7 @@ if [[ -f "$PROJECT_DIR/ops.config.sh" ]]; then
   source "$PROJECT_DIR/ops.config.sh"
 else
   OPS_SECRETS_MODULE="${GEOSTAT_MODULE_ID}"
-  OPS_TARGET_DEFAULT="${GEOSTAT_MODULE_ID}"
+  OPS_TARGET_DEFAULT="backend"
   VERSIONS_KEEP=5
   HEALTH_RETRIES=24
 fi

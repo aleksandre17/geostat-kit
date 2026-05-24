@@ -52,6 +52,12 @@ def normalize_service(svc_cfg: dict, environment: str) -> dict:
     cfg.pop("build", None)
     if "image" not in cfg and "container_name" in cfg:
         cfg["image"] = cfg["container_name"]
+    # Server deploy uploads ./Dockerfile + ./app.jar — build locally, do not pull from registry.
+    cfg["build"] = {"context": ".", "dockerfile": "Dockerfile"}
+    # Stack services reach API via Docker DNS (geostat-chat-ai-api:8090). Omit host ports so
+    # legacy containers (e.g. geostat-chat-api on :8090) can stay up during P6 transition.
+    if "ports" in cfg:
+        cfg.pop("ports", None)
 
     cfg["env_file"] = [f".env.{environment}"]
 

@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ============================================================
 #  Pre-flight Checks — validates all prerequisites before deploy
 #
@@ -20,23 +20,34 @@ WARNINGS=0
 
 # ── Parse args ──
 SERVICE="all"
-TARGET="${OPS_SECRETS_MODULE:-backend}"
 SKIP_BUILD=0
 for arg in "$@"; do
+    arg="${arg//$'\r'/}"
     case "$arg" in
         --no-build) SKIP_BUILD=1 ;;
         all)        SERVICE="all" ;;
+        backend|frontend) ;;
         *)          SERVICE="$arg" ;;
     esac
 done
 
-REMOTE="$SERVER_BASE/$PROJECT/$TARGET"
 COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.prod"
 DEPLOY_LIB="$(geostat_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
+module_load_registry
+
+module_port_env_key() {
+    local key
+    key="$(PYTHONPATH="${GEOSTAT_KIT_ROOT}" geostat_python "$GEOSTAT_KIT_ROOT/lib/config_gen.py" --port-env "$GEOSTAT_MODULE_ID" 2>/dev/null || true)"
+    [[ -n "$key" ]] || key="API_PORT"
+    echo "$key"
+}
+
+MODULE_PORT_ENV="$(module_port_env_key)"
 deploy_path_load_config
+DEPLOY_SUMMARY="$(deploy_path_summary)"
 if [[ -n "$SERVER" && -z "$SERVER_BASE" && -z "$DEPLOY_PATH_BASE" ]]; then
     warn "DEPLOY_SERVER_BASE unset — set in ops/config/deploy.env for predictable remote paths"
 fi
@@ -53,7 +64,7 @@ section() {
 
 echo ""
 echo "  ══════════════════════════════════════════════"
-printf "   \033[1mPre-flight Checks\033[0m  [%s → %s/%s]\n" "$SERVICE" "$PROJECT" "$TARGET"
+printf "   \033[1mPre-flight Checks\033[0m  [%s → %s]\n" "$SERVICE" "$DEPLOY_SUMMARY"
 echo "  ══════════════════════════════════════════════"
 
 # ════════════════════════════════════════════════
@@ -75,9 +86,15 @@ else
     fail "${SECRETS_DIR}/.env.prod missing  (see ${SECRETS_DIR}/.env.example)"
 fi
 
-# gradlew
+# gradlew (module dir or shared apps/backend wrapper for includeBuild modules)
+gradlew_dir="$PROJECT_DIR"
+if [[ ! -f "$PROJECT_DIR/gradlew" && ! -f "$PROJECT_DIR/gradlew.bat" ]]; then
+    if [[ -f "$MONOREPO/apps/backend/gradlew" || -f "$MONOREPO/apps/backend/gradlew.bat" ]]; then
+        gradlew_dir="$MONOREPO/apps/backend"
+    fi
+fi
 if [ "$SKIP_BUILD" = "0" ]; then
-    if [ -f "$PROJECT_DIR/gradlew" ] || [ -f "$PROJECT_DIR/gradlew.bat" ]; then
+    if [ -f "$gradlew_dir/gradlew" ] || [ -f "$gradlew_dir/gradlew.bat" ]; then
         ok "gradlew found"
     else
         fail "gradlew missing — cannot build"
@@ -100,14 +117,16 @@ for s in "${SERVICES[@]}"; do
     [ "$SERVICE" != "all" ] && [ "$SERVICE" != "$s" ] && continue
 
     # Dockerfile (runtime, uploaded by deploy)
-    if [ -f "$PROJECT_DIR/src/Dockerfile" ]; then
-        ok "src/Dockerfile found"
+    df="$(module_dockerfile "$s")"
+    if [ -f "$df" ]; then
+        ok "$(basename "$df") found ($(basename "$(dirname "$df")")/)"
     else
-        fail "src/Dockerfile missing"
+        fail "Dockerfile missing (expected $df)"
     fi
 
+    mod_dir="$(module_project_dir "$s")"
     # build.gradle.kts
-    if [ -f "$PROJECT_DIR/build.gradle.kts" ]; then
+    if [ -f "$mod_dir/build.gradle.kts" ]; then
         ok "build.gradle.kts found"
     else
         warn "build.gradle.kts missing"
@@ -115,8 +134,8 @@ for s in "${SERVICES[@]}"; do
 
     # app.jar (only relevant if --no-build)
     if [ "$SKIP_BUILD" = "1" ]; then
-        jar=$(ls "$PROJECT_DIR/build/libs/"*-boot.jar 2>/dev/null | head -1)
-        [ -z "$jar" ] && jar=$(ls "$PROJECT_DIR/build/libs/"*.jar 2>/dev/null | grep -iv plain | head -1)
+        jar=$(ls "$mod_dir/build/libs/"*-boot.jar 2>/dev/null | head -1)
+        [ -z "$jar" ] && jar=$(ls "$mod_dir/build/libs/"*.jar 2>/dev/null | grep -iv plain | head -1)
         if [ -n "$jar" ]; then
             ok "app.jar ready  ($(du -h "$jar" | cut -f1))"
         else
@@ -142,15 +161,19 @@ if [ -f "$SECRETS_DIR/.env.prod" ]; then
         fi
     }
 
-    # Required
-    check_var "API_PORT" "required"
+    # Required port — manifest-driven (API_PORT, RETRIEVAL_PORT, INGESTION_PORT, …)
+    check_var "$MODULE_PORT_ENV" "required"
 
-    # Optional
-    check_var "GEMINI_API_KEY"        "optional"
-    check_var "ELEVENLABS_API_KEY"    "optional"
-    check_var "GCP_PROJECT_ID"        "optional"
-    check_var "GEOSTAT_SEARCH_API_KEY" "optional"
-    check_var "GEOSTAT_SEARCH_CX_ID"  "optional"
+    # Shared optional
+    check_var "GEMINI_API_KEY" "optional"
+
+    # chat-api only optional integrations
+    if [ "$GEOSTAT_MODULE_ID" = "chat-api" ]; then
+        check_var "ELEVENLABS_API_KEY"    "optional"
+        check_var "GCP_PROJECT_ID"        "optional"
+        check_var "GEOSTAT_SEARCH_API_KEY" "optional"
+        check_var "GEOSTAT_SEARCH_CX_ID"  "optional"
+    fi
 fi
 
 # ════════════════════════════════════════════════

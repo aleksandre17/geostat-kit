@@ -103,6 +103,12 @@ def _launch_java(
     env_file = dbg.get("envFile")
     if env_file:
         cfg["envFile"] = "${workspaceFolder}/" + str(env_file).replace("\\", "/")
+    else:
+        dev_env = ctx.secrets_module_dir(module_id) / ".env.dev"
+        cfg["envFile"] = "${workspaceFolder}/" + _posix_rel(ctx.root, dev_env)
+    profiles = read_nested(ctx.manifest, f"modules.{module_id}.hybrid.springProfiles", "")
+    if profiles:
+        cfg["env"] = {"SPRING_PROFILES_ACTIVE": profiles}
     return cfg
 
 
@@ -111,6 +117,81 @@ def _geostat_script_rel(ctx: ProjectContext) -> str:
     if custom:
         return custom.replace("\\", "/")
     return default_field("vscode.geostatScript") or "tools/geostat.ps1"
+
+
+def _stack_infra_services(ctx: ProjectContext) -> list[str]:
+    stack = ctx.manifest.get("stack") if isinstance(ctx.manifest.get("stack"), dict) else {}
+    infra = stack.get("infra") if isinstance(stack.get("infra"), dict) else {}
+    services = infra.get("services")
+    if isinstance(services, list):
+        return [str(s) for s in services if s]
+    return []
+
+
+def _vscode_hybrid_cfg(ctx: ProjectContext) -> dict[str, Any]:
+    vscode = ctx.manifest.get("vscode")
+    if isinstance(vscode, dict):
+        hybrid = vscode.get("hybrid")
+        if isinstance(hybrid, dict):
+            return hybrid
+    return {}
+
+
+def _pick_module_by_role(ctx: ProjectContext, role: str, override: str = "") -> str | None:
+    if override and read_nested(ctx.manifest, f"modules.{override}.path", ""):
+        return override
+    ids = modules_by_role(ctx.manifest, role)
+    return ids[0] if ids else None
+
+
+def _find_launch_name_for_module(
+    configs: list[dict[str, Any]], module_id: str, ctx: ProjectContext
+) -> str | None:
+    rel = _posix_rel(ctx.root, ctx.module_path(module_id))
+    typ = read_nested(ctx.manifest, f"modules.{module_id}.type", "")
+    for cfg in configs:
+        cwd = str(cfg.get("cwd", "")).replace("\\", "/")
+        if not cwd.endswith(rel):
+            continue
+        if typ == "java-boot" and cfg.get("type") == "java":
+            return cfg["name"]
+        if typ == "node-vite" and cfg.get("type") == "node-terminal":
+            return cfg["name"]
+    return None
+
+
+TUNNEL_TASK_LABEL = "geostat: infra tunnel"
+TUNNEL_READY_PATTERN = "Set INFRA_HOST=127.0.0.1"
+
+
+def _infra_tunnel_task(ctx: ProjectContext) -> dict[str, Any]:
+    gs = _geostat_script_rel(ctx)
+    wf = "${workspaceFolder}"
+    return {
+        "label": TUNNEL_TASK_LABEL,
+        "type": "shell",
+        "command": "powershell",
+        "args": [
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            f"{wf}/{gs}",
+            "infra",
+            "tunnel",
+        ],
+        "options": {"cwd": wf},
+        "isBackground": True,
+        "presentation": {"reveal": "silent", "panel": "dedicated", "focus": False},
+        "problemMatcher": {
+            "owner": "geostat-infra-tunnel",
+            "pattern": {"regexp": "^.*$"},
+            "background": {
+                "activeOnStart": True,
+                "beginsPattern": "\\[infra\\]",
+                "endsPattern": TUNNEL_READY_PATTERN.replace(".", "\\."),
+            },
+        },
+    }
 
 
 def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
@@ -177,6 +258,27 @@ def build_launch_json(ctx: ProjectContext) -> dict[str, Any]:
                 "stopAll": True,
             }
         ]
+
+    if _stack_infra_services(ctx):
+        hybrid = _vscode_hybrid_cfg(ctx)
+        api_id = _pick_module_by_role(ctx, "api", str(hybrid.get("apiModule") or ""))
+        ui_id = _pick_module_by_role(ctx, "ui", str(hybrid.get("uiModule") or ""))
+        if api_id and ui_id:
+            api_launch = _find_launch_name_for_module(configs, api_id, ctx)
+            ui_launch = _find_launch_name_for_module(configs, ui_id, ctx)
+            if api_launch and ui_launch:
+                compound_name = str(
+                    hybrid.get("compoundName")
+                    or "Hybrid: infra tunnel + API + UI"
+                )
+                pre_launch = str(hybrid.get("preLaunchTask") or TUNNEL_TASK_LABEL)
+                hybrid_compound = {
+                    "name": compound_name,
+                    "configurations": [api_launch, ui_launch],
+                    "preLaunchTask": pre_launch,
+                    "stopAll": True,
+                }
+                out.setdefault("compounds", []).append(hybrid_compound)
     return out
 
 
@@ -203,6 +305,10 @@ def build_tasks_json(ctx: ProjectContext) -> dict[str, Any]:
         _task("geostat: compose-gen", ["compose-gen"]),
         _task("geostat: validate", ["validate"]),
     ]
+    if _stack_infra_services(ctx):
+        tasks.append(_infra_tunnel_task(ctx))
+        tasks.append(_task("geostat: infra remote up", ["infra", "remote", "up"]))
+        tasks.append(_task("geostat: infra remote status", ["infra", "remote", "status"]))
     for alias in sorted(set(aliases.values()), key=lambda x: aliases.get(x, x)):
         short = next((k for k, v in aliases.items() if v == alias), alias)
         tasks.append(_task(f"geostat: {short} check", [short, "check"]))

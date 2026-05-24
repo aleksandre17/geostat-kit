@@ -22,6 +22,7 @@ if ($Command -eq "init") {
 }
 
 . (Join-Path $PackageRoot "lib\project.ps1")
+. (Join-Path $PackageRoot "lib\geostat-python.ps1")
 
 . (Join-Path $PackageRoot "lib\drivers.ps1")
 . (Join-Path $PackageRoot "lib\modules.ps1")
@@ -51,11 +52,15 @@ function Show-Help {
 
     Write-Host @"
 
-  geostat - geostat-kit (kits/geostat-kit)
+  geostat — manifest-driven ops CLI (geostat-kit)
 
-    init | validate | migrate | vscode-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout
+    init | validate | migrate | vscode-gen | config-gen | stack | stack-deploy | compose-gen | nginx-gen | infra | layout | hybrid
 
-    mod <moduleId> deploy|manage|compose|check|modules  ...
+    mod <moduleId> deploy|manage|compose|check|modules|run  ...
+
+    hybrid boot <alias|moduleId>   Local app run (host + ops/config .env.dev)
+
+    <alias> run                    Same as hybrid boot; aliases from geostat.ops.json cli.aliases
 
     init  - full bootstrap (scaffold + seed secrets + compose-gen)
 
@@ -65,9 +70,10 @@ function Show-Help {
 
 "@
 
-    $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-
-    & $py (Join-Path $PackageRoot "lib\driver_api.py") list-types 2>$null
+    $pyArgs = Get-GeostatPythonArgs
+    if ($pyArgs) {
+        Invoke-GeostatPythonExe $pyArgs (Join-Path $PackageRoot "lib\driver_api.py") "list-types" 2>$null
+    }
 
     Write-Host ""
 
@@ -122,14 +128,24 @@ function Invoke-ModuleDriver {
 
     $sub = if ($DriverArgs.Count -gt 0) { $DriverArgs[0] } else { "deploy" }
 
-    $rest = if ($DriverArgs.Count -gt 1) { $DriverArgs[1..($DriverArgs.Count - 1)] } else { @() }
+    $rest = @()
+    if ($DriverArgs.Count -gt 1) {
+        $rest = [string[]]@($DriverArgs | Select-Object -Skip 1)
+    }
 
-    # node-vite: "fe watch" -> "fe deploy watch" (static dist); "fe dev watch" stays under dev.ps1
+    # node-vite: "<alias> watch" -> deploy watch; "<alias> dev watch" -> dev.ps1
     $modType = Get-ModuleType $ModuleId
+    if ($sub -eq "run") {
+        $env:GEOSTAT_MODULE_ID = $ModuleId
+        $runScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "run"
+        & $runScript @rest
+        exit $LASTEXITCODE
+    }
+
     if ($sub -eq "watch" -and $modType -eq "node-vite") {
         Write-Host ""
-        Write-Host "  Hint: fe watch -> fe deploy watch (npm build + static dist on server)" -ForegroundColor Yellow
-        Write-Host "        fe dev watch -> source rsync to Linux dev container (no npm build)" -ForegroundColor Yellow
+        Write-Host "  Hint: <alias> watch -> <alias> deploy watch (static dist on server)" -ForegroundColor Yellow
+        Write-Host "        <alias> dev watch -> source rsync to remote dev container" -ForegroundColor Yellow
         Write-Host ""
         $env:GEOSTAT_MODULE_ID = $ModuleId
         $deployScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "deploy"
@@ -138,8 +154,8 @@ function Invoke-ModuleDriver {
     }
     if ($sub -eq "watch" -and $modType -eq "java-boot") {
         Write-Host ""
-        Write-Host "  Hint: be watch -> be dev watch (rsync + bootRun in workspace/)" -ForegroundColor Yellow
-        Write-Host "        be deploy watch -> Gradle bootJar + runtime/ (staging JAR loop)" -ForegroundColor Yellow
+        Write-Host "  Hint: <alias> watch -> <alias> dev watch (rsync + bootRun in workspace/)" -ForegroundColor Yellow
+        Write-Host "        <alias> deploy watch -> bootJar + runtime/ publish loop" -ForegroundColor Yellow
         Write-Host ""
         $env:GEOSTAT_MODULE_ID = $ModuleId
         $devScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "dev"
@@ -147,7 +163,7 @@ function Invoke-ModuleDriver {
         exit $LASTEXITCODE
     }
 
-    # java-boot: "be deploy watch" — JAR publish loop (subcommand under deploy)
+    # java-boot: "<alias> deploy watch" — JAR publish loop (subcommand under deploy)
     if ($sub -eq "deploy" -and $modType -eq "java-boot" -and $rest.Count -gt 0 -and $rest[0] -eq "watch") {
         $env:GEOSTAT_MODULE_ID = $ModuleId
         $deployScript = Get-DriverCommandPath -ModuleId $ModuleId -Command "deploy"
@@ -189,9 +205,26 @@ function Invoke-ModuleDriver {
         & $bash $script @rest
 
     } else {
-
-        & $script @rest
-
+        if ($type -eq "node-vite" -and $sub -eq "deploy") {
+            $feEnv = "prod"
+            $feArgs = [System.Collections.ArrayList]@()
+            for ($i = 0; $i -lt $rest.Count; $i++) {
+                $a = [string]$rest[$i]
+                if ($a -eq "-Environment" -and ($i + 1) -lt $rest.Count) {
+                    $feEnv = [string]$rest[$i + 1]
+                    $i++
+                    continue
+                }
+                [void]$feArgs.Add($a)
+            }
+            if ($feArgs.Count -gt 0) {
+                & $script -Arg1 ([string]$feArgs[0]) -Environment ([string]$feEnv)
+            } else {
+                & $script -Environment ([string]$feEnv)
+            }
+        } else {
+            & $script @rest
+        }
     }
 
     exit $LASTEXITCODE
@@ -216,33 +249,38 @@ $globalCommands = @{
 
         if (-not (Test-Path $bash)) { Write-Host "Git Bash required"; exit 1 }
 
-        & $bash (Join-Path $PackageRoot "toolkit\deploy\stack-remote.sh") @Args
+        & $bash (Join-Path $PackageRoot "toolkit\deploy\stack-remote.sh") @CliRest
 
         exit $LASTEXITCODE
 
     }
 
     "validate" = {
-        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
         $env:PYTHONPATH = "$PackageRoot"
-        & $py (Join-Path $PackageRoot "lib\validate_manifest.py")
-        exit $LASTEXITCODE
+        Invoke-GeostatPython (Join-Path $PackageRoot "lib\validate_manifest.py")
     }
 
     "migrate" = {
-        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
         $env:PYTHONPATH = "$PackageRoot"
-        & $py (Join-Path $PackageRoot "lib\migrate_manifest.py") @Args
-        exit $LASTEXITCODE
+        Invoke-GeostatPython (Join-Path $PackageRoot "lib\migrate_manifest.py") @Args
     }
 
     "vscode-gen" = {
-        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
         $env:PYTHONPATH = "$PackageRoot"
         $vargs = @()
         if ($CliRest -contains "--force") { $vargs += "--force" }
-        & $py (Join-Path $PackageRoot "lib\vscode_gen.py") @vargs
-        exit $LASTEXITCODE
+        Invoke-GeostatPython (Join-Path $PackageRoot "lib\vscode_gen.py") @vargs
+    }
+
+    "config-gen" = {
+        $env:PYTHONPATH = "$PackageRoot"
+        $cargs = @()
+        if ($CliRest -contains "--all") { $cargs += "--all" }
+        if ($CliRest -contains "--check") { $cargs += "--check" }
+        if ($CliRest -contains "--dry-run") { $cargs += "--dry-run" }
+        $mod = $CliRest | Where-Object { $_ -notin @("--all", "--check", "--dry-run") } | Select-Object -First 1
+        if ($mod) { $cargs += $mod }
+        Invoke-GeostatPython (Join-Path $PackageRoot "lib\config_gen.py") @cargs
     }
 
     "compose-gen" = {
@@ -254,24 +292,27 @@ $globalCommands = @{
     }
 
     "nginx-gen" = {
-
-        $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-
-        & $py (Join-Path $PackageRoot "adapters\render_nginx.py")
-
-        exit $LASTEXITCODE
-
+        Invoke-GeostatPython (Join-Path $PackageRoot "adapters\render_nginx.py")
     }
 
     "infra" = {
 
         $infraDriver = Join-Path $PackageRoot "toolkit\infra\Invoke-Infra.ps1"
-        $infraPass = @($CliRest)
-        if ($infraPass.Count -eq 0 -and $infraPass -isnot [string]) {
-            $infraPass = @()
+        $infraPass = [System.Collections.ArrayList]@($CliRest)
+        $infraProd = $false
+        if ($infraPass -contains "-Prod" -or $infraPass -contains "--prod") {
+            $infraProd = $true
+            [void]$infraPass.Remove("-Prod")
+            [void]$infraPass.Remove("--prod")
         }
         if ($infraPass.Count -gt 0 -and (Test-Path $infraDriver)) {
-            & $infraDriver @infraPass
+            $infraMode = [string]$infraPass[0]
+            $infraAction = if ($infraPass.Count -gt 1) { [string]$infraPass[1] } else { "" }
+            if ($infraProd) {
+                & $infraDriver $infraMode $infraAction -Prod
+            } else {
+                & $infraDriver $infraMode $infraAction
+            }
             exit $LASTEXITCODE
         }
         if (-not (Test-Path $bash)) { Write-Host "Git Bash required for: geostat infra (prereqs)"; exit 1 }
@@ -281,6 +322,26 @@ $globalCommands = @{
     }
 
     "layout" = {
+        if ($CliRest.Count -ge 1 -and $CliRest[0] -eq "migrate") {
+            if (-not (Test-Path $bash)) {
+                Write-Host "  Git Bash required for: geostat layout migrate ($bash)" -ForegroundColor Red
+                exit 1
+            }
+            $migrateArgs = @()
+            if ($CliRest.Count -gt 1) { $migrateArgs = $CliRest[1..($CliRest.Count - 1)] }
+            & $bash (Join-Path $PackageRoot "toolkit\deploy\migrate-layout.sh") @migrateArgs
+            exit $LASTEXITCODE
+        }
+        if ($CliRest.Count -ge 1 -and $CliRest[0] -eq "cleanup") {
+            if (-not (Test-Path $bash)) {
+                Write-Host "  Git Bash required for: geostat layout cleanup ($bash)" -ForegroundColor Red
+                exit 1
+            }
+            $cleanupArgs = @()
+            if ($CliRest.Count -gt 1) { $cleanupArgs = $CliRest[1..($CliRest.Count - 1)] }
+            & $bash (Join-Path $PackageRoot "toolkit\deploy\cleanup-scoped-layout.sh") @cleanupArgs
+            exit $LASTEXITCODE
+        }
         $layoutArgs = [System.Collections.ArrayList]@($CliRest)
         $roleFilter = $null
         $modFilter = $null
@@ -334,6 +395,23 @@ $globalCommands = @{
             & (Join-Path $PackageRoot "toolkit\layout\simulate-server-layout.ps1") @layoutArgs
         }
         exit $LASTEXITCODE
+    }
+
+    "hybrid" = {
+        if ($CliRest.Count -lt 2 -or $CliRest[0] -ne "boot") {
+            Write-Host "  Usage: geostat hybrid boot <alias|moduleId>" -ForegroundColor Red
+            Write-Host "  Aliases: see geostat.ops.json cli.aliases (geostat help)"
+            exit 1
+        }
+        $target = Resolve-CliAlias $CliRest[1]
+        if (-not $target) {
+            $target = $CliRest[1]
+        }
+        if (-not (Get-ModuleManifestEntry $target)) {
+            Write-Host "  Unknown module or alias: $($CliRest[1])" -ForegroundColor Red
+            exit 1
+        }
+        Invoke-ModuleDriver -ModuleId $target -DriverArgs @("run")
     }
 
 }

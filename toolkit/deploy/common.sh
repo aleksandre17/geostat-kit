@@ -36,3 +36,30 @@ discover_services() {
   done
   [[ ${#filtered[@]} -gt 0 ]] && SERVICES=("${filtered[@]}")
 }
+
+# Map shorthand (api, retrieval) → compose key (geostat-chat-ai-api, …)
+resolve_deploy_service_arg() {
+  local raw="$1" s
+  [[ -z "$raw" || "$raw" == "all" ]] && { echo "$raw"; return 0; }
+  for s in "${SERVICES[@]}"; do
+    [[ "$s" == "$raw" ]] && { echo "$raw"; return 0; }
+  done
+  for s in "${SERVICES[@]}"; do
+    [[ "$s" == *"-$raw" ]] && { echo "$s"; return 0; }
+  done
+  return 1
+}
+
+apply_deploy_service_arg() {
+  local resolved
+  SERVICE="${SERVICE//$'\r'/}"
+  [[ -z "$SERVICE" || "$SERVICE" == "all" ]] && return 0
+  if resolved="$(resolve_deploy_service_arg "$SERVICE")"; then
+    [[ "$resolved" != "$SERVICE" ]] && deploy_log "  Service: $SERVICE → $resolved"
+    SERVICE="$resolved"
+    return 0
+  fi
+  deploy_log "  ERROR: Unknown service '$SERVICE'"
+  deploy_log "  Available: ${SERVICES[*]} all"
+  exit 1
+}

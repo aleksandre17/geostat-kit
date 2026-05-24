@@ -111,6 +111,39 @@ def backend_deploy_path_candidates(*, base: str, container_name: str) -> list[st
     ]
 
 
+def resolve_deploy_path_base(
+    *,
+    module_deploy_path: str | None,
+    base_module_deploy_path: str | None,
+    default_remote_base: str | None = None,
+) -> str:
+    """Mirror deploy-path.sh: worker modules inherit backend DEPLOY_PATH when omitted."""
+    if module_deploy_path:
+        return normalize_base(module_deploy_path)
+    if base_module_deploy_path:
+        return normalize_base(base_module_deploy_path)
+    if default_remote_base:
+        return normalize_base(default_remote_base)
+    return ""
+
+
+def deploy_path_summary(
+    *,
+    base: str | None,
+    layout: str = "structured",
+    server_base: str | None = None,
+    project: str | None = None,
+) -> str:
+    if not base:
+        sb = normalize_base(server_base) if server_base else "/home/administrator"
+        proj = project or "geostat"
+        return f"{sb}/{proj}/backend/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
+    base = normalize_base(base)
+    if layout == "structured":
+        return f"{base}/runtime/<container>/"
+    return f"{base}/<container>/"
+
+
 def deploy_path_candidates(*, base: str, container_name: str) -> list[str]:
     base = normalize_base(base)
     if not base:

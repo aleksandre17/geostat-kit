@@ -1,15 +1,6 @@
 #!/bin/bash
 # Module driver resolution — delegates to lib/driver_api.py (manifest + registry)
-
-geostat_python() {
-  if command -v python3 &>/dev/null; then
-    python3 "$@"
-  elif command -v py &>/dev/null; then
-    py -3 "$@"
-  else
-    python "$@"
-  fi
-}
+# geostat_python — from project.sh (Windows-safe)
 
 geostat_driver_api() {
   geostat_python "$(geostat_kit_package_root)/lib/driver_api.py" "$@"
@@ -21,7 +12,7 @@ geostat_driver_registry() {
 
 geostat_module_config() {
   local id="$1" key="$2" default="${3:-}"
-  python3 -c "
+  geostat_python -c "
 import json, os, sys
 root = os.environ.get('GEOSTAT_PROJECT_ROOT', '')
 mf = os.path.join(root, 'geostat.ops.json')

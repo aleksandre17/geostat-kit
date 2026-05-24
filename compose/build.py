@@ -140,7 +140,11 @@ def main() -> int:
     root = find_project_root()
     os.environ.setdefault("GEOSTAT_PROJECT_ROOT", str(root))
     fmt_global = global_fmt(root)
-    templates, targets, features = load_catalog(root)
+    manifest = load_manifest(root)
+    templates, targets, catalog_features = load_catalog(root)
+    from lib.compose_identity import effective_compose_features
+
+    features = effective_compose_features(manifest, catalog_features)
     for path, spec in targets.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(

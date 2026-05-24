@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lib.compose_identity import primary_api_module_id, primary_worker_module_id
 from lib.credentials import all_module_credential_files, module_credentials
 from lib.project_context import ProjectContext, load_manifest
 
@@ -97,6 +98,23 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
     cat = ctx.catalog_path
     if not cat.is_file():
         warnings.append(f"compose.catalog: missing ({cat.relative_to(root)})")
+    elif cat.is_file():
+        catalog = json.loads(cat.read_text(encoding="utf-8"))
+        cat_worker = bool((catalog.get("features") or {}).get("worker", False))
+        primary = primary_api_module_id(ctx.manifest)
+        if primary:
+            pcfg = (ctx.manifest.get("modules") or {}).get(primary) or {}
+            compose = pcfg.get("compose") if isinstance(pcfg, dict) else None
+            has_manifest_flag = isinstance(compose, dict) and "embeddedWorker" in compose
+            if cat_worker and not has_manifest_flag:
+                warnings.append(
+                    "compose.catalog features.worker=true is deprecated — set "
+                    f"modules.{primary}.compose.embeddedWorker in geostat.ops.json (P0-kit-13)"
+                )
+            if cat_worker and primary_worker_module_id(ctx.manifest):
+                warnings.append(
+                    "features.worker + manifest role=worker module — pick one worker model (Architecture B)"
+                )
 
     ci = ctx.manifest.get("ci") or {}
     if isinstance(ci, dict):
@@ -140,6 +158,15 @@ def _validate_project(ctx: ProjectContext, registry: dict[str, Any]) -> list[str
     from lib.stack_deploy import validate_stack_deploy
 
     warnings.extend(validate_stack_deploy(ctx.manifest))
+
+    try:
+        from lib.config_gen import check_module_drift, java_boot_modules_with_datastores
+
+        for mid in java_boot_modules_with_datastores(ctx):
+            for issue in check_module_drift(ctx, mid):
+                errs.append(f"config-gen: {issue}")
+    except ImportError:
+        pass
 
     return errs, warnings
 

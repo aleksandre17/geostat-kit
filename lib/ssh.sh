@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # SSH helpers for geostat deploy — optional project-local keys under ops/config/ssh/
 # Source after geostat_monorepo_root / geostat_deploy_env_value are available.
 
@@ -39,7 +39,7 @@ geostat_ssh() {
   while IFS= read -r _line; do
     [[ -n "$_line" ]] && _extra+=("$_line")
   done < <(geostat_ssh_extra_args)
-  ssh "${_extra[@]}" "$@"
+  command ssh "${_extra[@]}" "$@"
 }
 
 geostat_scp() {
@@ -47,7 +47,7 @@ geostat_scp() {
   while IFS= read -r _line; do
     [[ -n "$_line" ]] && _extra+=("$_line")
   done < <(geostat_ssh_extra_args)
-  scp "${_extra[@]}" "$@"
+  command scp "${_extra[@]}" "$@"
 }
 
 # When deploy.env sets SSH options, prefer geostat_ssh/geostat_scp in toolkit scripts.

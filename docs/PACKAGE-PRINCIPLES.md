@@ -58,7 +58,7 @@ Optional filter: `stack.modules` — list of module ids to show (default: all ma
 
 **Do not enable both** for the same logical job. Architecture B consumers should set `features.worker: false` and declare ingestion (or other workers) in the manifest only.
 
-**Future kit:** move embedded worker to manifest (`modules.backend.compose.embeddedWorker` or a dedicated sub-module) and deprecate `features.worker`.
+**Future kit:** move embedded worker to manifest (`modules.<api>.compose.embeddedWorker`) and deprecate `features.worker`. **Done (P0-kit-13):** manifest flag + `effective_compose_features`; catalog fallback with validate warning.
 
 ## Stack remote deploy (`stackDeploy`)
 
@@ -98,6 +98,27 @@ Inspect names: `geostat` → `modules_cli.py compose-names` (JSON) or after `com
 **Not used:** hardcoded single API URL in `integration-stack.sh` when N modules exist.
 
 Inspect: `modules_cli.py stack-health` (TSV: module, url, expect).
+
+## Hybrid local run (`geostat hybrid boot` / `<alias> run`)
+
+| Layer | Owns |
+|-------|------|
+| **Kit** `toolkit/hybrid/Invoke-HybridRun.ps1` | Load secrets `.env.dev`, Gradle bootRun / npm per driver type |
+| **Kit** `drivers/*/ps1/run.ps1` | Thin delegate; `run` in `drivers/registry.json` |
+| **Kit** `cli/geostat.ps1` | `hybrid boot <alias\|moduleId>` → module driver `run` |
+| **Consumer** `geostat.ops.json` `modules.*.hybrid` | `springProfiles`, `gradleWrapper`, `gradleProject`, `npmScript` |
+| **Consumer** `cli.aliases` | Short names (`fe`, `be`, …) — project-specific, not in kit help text |
+
+**Not used:** consumer repo path (`kits/geostat-kit`), product aliases, or dev-mode labels in kit runtime strings.
+
+## App config generation (config-gen)
+
+| Layer | Owns |
+|-------|------|
+| **Kit** `lib/config_gen.py`, `config/config-catalog.json` | Profile boilerplate templates |
+| **Kit** `geostat config-gen`, validate drift | Generate / check |
+| **Consumer** `modules.*.datastores`, `modules.*.spring` | Postgres schema, profile groups |
+| **Consumer** `application-custom.yml` | Domain config — generator never touches |
 
 ## Adding a new data store
 

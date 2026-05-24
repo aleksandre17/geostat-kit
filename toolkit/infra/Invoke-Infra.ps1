@@ -74,6 +74,8 @@ function Resolve-InfraComposeFileArgs {
     if ($IsProd) {
         $prod = Join-Path $InfraComposeDir "docker-compose.prod.yml"
         if (Test-Path $prod) { [void]$files.AddRange(@('-f', $prod)) }
+        $coexist = Join-Path $InfraComposeDir "docker-compose.coexist.yml"
+        if (Test-Path $coexist) { [void]$files.AddRange(@('-f', $coexist)) }
     }
     return $files.ToArray()
 }
@@ -173,6 +175,8 @@ function Invoke-InfraRemoteCompose {
     Add-InfraComposeFileArgs -Target $composeParts
     $composeFiles = (($composeParts -join ' ') -replace '\\', '/')
     if ($Prod) { $composeFiles += " -f docker-compose.prod.yml" }
+    $coexist = Join-Path $InfraComposeDir "docker-compose.coexist.yml"
+    if ($Prod -and (Test-Path $coexist)) { $composeFiles += " -f docker-compose.coexist.yml" }
     $prodFlag = if ($Prod) { " (prod overlay)" } else { "" }
     Write-InfraLog "Remote $ComposeAction on $server$prodFlag -> $remoteBase"
 

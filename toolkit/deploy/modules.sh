@@ -109,6 +109,10 @@ module_dockerfile() {
     echo "$PROJECT_DIR/$s/Dockerfile"
     return 0
   fi
+  if [[ -f "$PROJECT_DIR/Dockerfile" ]]; then
+    echo "$PROJECT_DIR/Dockerfile"
+    return 0
+  fi
   echo "$PROJECT_DIR/src/Dockerfile"
 }
 

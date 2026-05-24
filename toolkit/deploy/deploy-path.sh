@@ -4,7 +4,12 @@
 # Optional: COMPOSE_FILE, PROJECT_DIR for container_name_for (modules.sh)
 
 deploy_path_load_config() {
+  local deploy_base_module
+  deploy_base_module="$(geostat_read_manifest_field stack.deployBaseSecretsModule backend)"
   DEPLOY_PATH_BASE="${DEPLOY_PATH_BASE:-$(geostat_env_value "$OPS_SECRETS_MODULE" DEPLOY_PATH "")}"
+  if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" && "$OPS_SECRETS_MODULE" != "$deploy_base_module" ]]; then
+    DEPLOY_PATH_BASE="$(geostat_env_value "$deploy_base_module" DEPLOY_PATH "")"
+  fi
   if [[ -z "$DEPLOY_PATH_BASE" && -n "${OPS_SECRETS_MODULE:-}" ]]; then
     DEPLOY_PATH_BASE="$(geostat_default_remote_deploy_base "$OPS_SECRETS_MODULE")"
   fi
@@ -90,4 +95,18 @@ backend_find_deployed_path() {
     fi
   done < <(backend_deploy_path_candidates "$cname")
   return 1
+}
+
+# Log-friendly summary of where JAR deploy lands (structured: backend/runtime/<container>/)
+deploy_path_summary() {
+  deploy_path_load_config
+  if [[ -z "$DEPLOY_PATH_BASE" ]]; then
+    echo "${SERVER_BASE}/${PROJECT}/backend/runtime/<container>/ (set DEPLOY_PATH in ops/config)"
+    return 0
+  fi
+  if [[ "$DEPLOY_LAYOUT" == "structured" ]]; then
+    echo "${DEPLOY_PATH_BASE}/runtime/<container>/"
+    return 0
+  fi
+  echo "${DEPLOY_PATH_BASE}/<container>/"
 }

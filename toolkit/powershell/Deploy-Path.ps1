@@ -2,6 +2,12 @@
 
 function Get-DeployPathBase {
     $base = Get-EnvValue "DEPLOY_PATH"
+    if (-not $base) {
+        $deployBaseModule = Get-ManifestField "stack.deployBaseSecretsModule" "backend"
+        if ($OpsSecretsModule -and $OpsSecretsModule -ne $deployBaseModule) {
+            $base = Get-SecretsEnvValue -Module $deployBaseModule -Key "DEPLOY_PATH"
+        }
+    }
     if (-not $base -and $script:SERVER_BASE -and $OpsSecretsModule) {
         $base = Get-DefaultRemoteDeployPathBase -SecretsFolder $OpsSecretsModule
     }
@@ -244,7 +250,7 @@ function Sync-StaticArtifactsToServer {
     & ssh @(Get-GeostatSshExtraArgs) $script:SERVER "mkdir -p $($script:DEPLOY_PATH)/dist" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "mkdir on server failed" }
 
-    $rc = Invoke-SCP -Source $DistDir -Dest "$($script:DEPLOY_PATH)/"
+    $rc = Invoke-SCP -Source $DistDir -Dest "$($script:DEPLOY_PATH)/" -Recurse
     if ($rc -ne 0) { throw "scp dist failed" }
 
     if ($IncludeNginx) {
@@ -271,15 +277,36 @@ function Sync-StaticArtifactsToServer {
 }
 
 # Requires Invoke-NginxGen from deploy.ps1 scope or define stub
+function Get-GeostatPythonArgs {
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3 -c "import sys" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { return @("py", "-3") }
+    }
+    foreach ($candidate in @("python", "python3")) {
+        if (-not (Get-Command $candidate -ErrorAction SilentlyContinue)) { continue }
+        & $candidate -c "import sys" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { return @($candidate) }
+    }
+    return $null
+}
+
 function Invoke-NginxGen {
     $py = Join-Path $env:GEOSTAT_KIT_ROOT "adapters\render_nginx.py"
     if (-not (Test-Path $py)) {
         Log "render_nginx.py missing - using existing nginx.conf" "WARN"
         return
     }
-    $pyExe = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+    $pyArgs = Get-GeostatPythonArgs
+    if (-not $pyArgs) {
+        Log "Python not found - using existing nginx.conf" "WARN"
+        return
+    }
     $env:GEOSTAT_PROJECT_ROOT = Get-MonorepoRoot
-    & $pyExe $py
+    if ($pyArgs.Count -gt 1) {
+        & $pyArgs[0] $pyArgs[1] $py
+    } else {
+        & $pyArgs[0] $py
+    }
     if ($LASTEXITCODE -ne 0) { Log "nginx-gen FAILED" "ERROR"; exit 1 }
     Log "nginx.conf rendered from secrets" "OK"
 }

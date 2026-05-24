@@ -15,6 +15,16 @@ HEADER = "# GENERATED — do not edit. Run: geostat compose-gen\n"
 SHARED = "|shared|library||yes\n"
 
 
+def _shared_module_line(root: Path, manifest: dict) -> str | None:
+    """Emit shared Gradle submodule row only when the consumer still has apps/backend/shared."""
+    modules = manifest.get("modules") or {}
+    chat = modules.get("chat-api") or modules.get("backend") or {}
+    rel = chat.get("path") or "apps/backend"
+    if (root / rel / "shared" / "build.gradle.kts").is_file():
+        return SHARED.rstrip()
+    return None
+
+
 def main() -> int:
     root = find_project_root()
     manifest_path = root / "geostat.ops.json"
@@ -26,10 +36,15 @@ def main() -> int:
 
     ctx = ProjectContext(root=root, manifest=manifest)
     fmt = global_fmt(root)
-    _, _, features = load_catalog(root)
+    _, _, catalog_features = load_catalog(root)
+    from lib.compose_identity import effective_compose_features
+
+    features = effective_compose_features(manifest, catalog_features)
     lines = [HEADER.rstrip(), "# Format: compose_service|gradle_module|type|dockerfile|enabled"]
     lines.extend(ops_modules_lines(ctx, fmt, features))
-    lines.append(SHARED.rstrip())
+    shared_line = _shared_module_line(root, manifest)
+    if shared_line:
+        lines.append(shared_line)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"  wrote {out.relative_to(root)}")

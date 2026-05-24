@@ -40,7 +40,10 @@ def test_api_env_deploy_matches_deploy_env(secrets_root: Path, manifest: dict) -
 
 
 def test_migrate_script_exists(pkg_root: Path) -> None:
-    assert (pkg_root / "toolkit" / "deploy" / "migrate-backend-layout.sh").is_file()
+    deploy = pkg_root / "toolkit" / "deploy"
+    assert (deploy / "migrate-backend-layout.sh").is_file()
+    assert (deploy / "migrate-frontend-layout.sh").is_file()
+    assert (deploy / "migrate-layout.sh").is_file()
 
 
 def test_devtools_in_root_gradle(manifest: dict, repo_root: Path) -> None:

@@ -20,18 +20,14 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_init.sh"
 source "$GEOSTAT_KIT_ROOT/toolkit/bash/compose-cli.sh"
 
 # ── Parse TARGET / ENV from args ──
-TARGET="backend"
 MANAGE_ENV="prod"
 for arg in "$@"; do
     case "$arg" in
-        backend)  TARGET="backend"  ;;
-        frontend) TARGET="frontend" ;;
         --dev)    MANAGE_ENV="dev"  ;;
         --prod)   MANAGE_ENV="prod" ;;
     esac
 done
 
-REMOTE="$SERVER_BASE/$PROJECT/$TARGET"
 COMPOSE_FILE="docker-compose.${MANAGE_ENV}.yml"
 ENV_FILE=".env.${MANAGE_ENV}"
 geostat_compose_init
@@ -40,6 +36,8 @@ COMPOSE="${GEOSTAT_COMPOSE[*]} -f $COMPOSE_FILE --env-file ./$ENV_FILE"
 DEPLOY_LIB="$(geostat_kit_deploy_lib)"
 # shellcheck source=../../toolkit/deploy/common.sh
 source "$DEPLOY_LIB/common.sh"
+deploy_path_load_config
+DEPLOY_SUMMARY="$(deploy_path_summary)"
 
 _manage_remote_dir() {
   local s="$1" name
@@ -65,7 +63,7 @@ for _ms in "${_MANAGE_COMPOSE_SVCS[@]}"; do
 done
 if [ ${#SERVICES[@]} -eq 0 ]; then
     deploy_path_load_config
-    echo "  ERROR: No deployed services found (checked under ${DEPLOY_PATH_BASE:-$REMOTE})."
+    echo "  ERROR: No deployed services found (checked under ${DEPLOY_PATH_BASE:-$DEPLOY_SUMMARY})."
     echo "  Run: geostat be deploy <service> --$MANAGE_ENV"
     exit 1
 fi
@@ -111,11 +109,23 @@ is_valid_service() {
     return 1
 }
 
+resolve_manage_service_arg() {
+    local raw="$1" s
+    [ "$raw" = "all" ] && { echo "$raw"; return 0; }
+    for s in "${SERVICES[@]}"; do
+        [ "$s" = "$raw" ] && { echo "$raw"; return 0; }
+    done
+    for s in "${SERVICES[@]}"; do
+        [[ "$s" == *"-$raw" ]] && { echo "$s"; return 0; }
+    done
+    return 1
+}
+
 # ── Level 1: Service selection ──
 if [ -z "$SVC" ]; then
     echo ""
     echo "  =========================================="
-    echo "   Service Manager  [$PROJECT/$TARGET]"
+    echo "   Service Manager  [$DEPLOY_SUMMARY]"
     echo "  =========================================="
     echo ""
     echo "   Services:"
@@ -154,13 +164,21 @@ if [ -z "$ACTION" ]; then
 fi
 
 if ! is_valid_service "$SVC"; then
+    resolved=""
+    if resolved="$(resolve_manage_service_arg "$SVC" 2>/dev/null)"; then
+        [[ "$resolved" != "$SVC" ]] && echo "  Service: $SVC → $resolved"
+        SVC="$resolved"
+    fi
+fi
+
+if ! is_valid_service "$SVC"; then
     echo "  ERROR: Unknown service '$SVC'"
     echo "  Available: ${SERVICES[*]} all"
     exit 1
 fi
 
 echo ""
-echo "  [$SVC] $ACTION  ($PROJECT/$TARGET)"
+echo "  [$SVC] $ACTION  ($DEPLOY_SUMMARY)"
 echo "  ------------------------------------------"
 
 # ── SSH helpers ──

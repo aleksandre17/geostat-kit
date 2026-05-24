@@ -67,7 +67,7 @@ def frontend_dir(repo_root: Path, manifest: dict) -> Path:
 
 @pytest.fixture
 def backend_dir(repo_root: Path, manifest: dict) -> Path:
-    return repo_module(repo_root, manifest, "backend")
+    return repo_module(repo_root, manifest, "chat-api")
 
 
 @pytest.fixture

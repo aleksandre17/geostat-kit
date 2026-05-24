@@ -1,13 +1,16 @@
 # Module driver resolution — manifest type + drivers/registry.json (see lib/driver_api.py)
 
+. (Join-Path $PSScriptRoot "geostat-python.ps1")
+
 function Get-DriverApiScript {
     Join-Path (Get-OpsPackageRoot) "lib\driver_api.py"
 }
 
 function Invoke-DriverApi {
     param([string[]]$ApiArgs)
-    $py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-    & $py (Get-DriverApiScript) @ApiArgs
+    $pyArgs = Get-GeostatPythonArgs
+    if (-not $pyArgs) { throw "Python not found (tried py -3, python3, python)" }
+    Invoke-GeostatPythonExe $pyArgs (Get-DriverApiScript) @ApiArgs
     if ($LASTEXITCODE -ne 0) { throw "driver_api failed" }
 }
 

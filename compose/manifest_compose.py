@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.compose_identity import (
+    embedded_worker_enabled,
     load_deploy_env,
     primary_api_module_id,
     resolve_module_service_name,
@@ -41,12 +42,10 @@ def _rel_posix(from_dir: Path, to_path: Path) -> str:
 def _resolve_dockerfiles(module_path: Path, module_id: str, role: str, driver_type: str) -> tuple[str, str, str]:
     """Return (dockerfile_dev, dockerfile_prod, build_context_prod_rel_suffix)."""
     if driver_type == "node-vite":
-        return "src/Dockerfile", "src/Dockerfile", "."
+        return "Dockerfile", "Dockerfile", "."
     if (module_path / "Dockerfile.dev").is_file():
         return "Dockerfile.dev", "Dockerfile", "."
-    if module_id == "backend" and role == "api":
-        return "src/Dockerfile.dev", "Dockerfile", "src"
-    return "src/Dockerfile.dev", "src/Dockerfile", "src"
+    return "Dockerfile.dev", "Dockerfile", "."
 
 
 def _role_catalog_entry(stack_cat: dict[str, Any], role: str) -> dict[str, Any]:
@@ -251,7 +250,9 @@ def build_manifest_stack_services(
                 stack_cat=stack_cat,
             )
         )
-    if features.get("worker", False) and primary_api_module_id(ctx.manifest, module_ids):
+    if embedded_worker_enabled(ctx.manifest, features) and primary_api_module_id(
+        ctx.manifest, module_ids
+    ):
         chunks.append(
             render_backend_embedded_worker(
                 profile=profile,
@@ -310,9 +311,11 @@ def ops_modules_lines(
         _, df_prod, prod_suffix = _resolve_dockerfiles(module_path, mid, role, "java-boot")
         if prod_suffix == "src" and not df_prod.startswith("src/"):
             df_prod = f"src/{df_prod}"
-        gradle = "worker" if role == "worker" and mid != "backend" else ""
-        lines.append(f"{service}|{gradle}|boot|{df_prod}|yes")
-    if features.get("worker", False) and primary_api_module_id(ctx.manifest, module_ids):
+        # Standalone java-boot modules use root bootJar; embedded backend worker is appended below.
+        lines.append(f"{service}||boot|{df_prod}|yes")
+    if embedded_worker_enabled(ctx.manifest, features) and primary_api_module_id(
+        ctx.manifest, module_ids
+    ):
         lines.append(
             f"{fmt_global['worker_service']}|worker|boot|worker/Dockerfile|yes"
         )

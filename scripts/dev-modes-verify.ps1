@@ -68,7 +68,8 @@ Add-Result ".vscode/tasks.json" (Test-Path $tasks) $tasks
 Write-Host "--- 4. Mode 1 local host (prereqs) ---" -ForegroundColor Cyan
 $mf = Get-Content (Join-Path $Root "geostat.ops.json") -Raw | ConvertFrom-Json
 $fePath = Join-Path $Root ($mf.modules.frontend.path -replace '/', '\')
-$bePath = Join-Path $Root ($mf.modules.backend.path -replace '/', '\')
+$beModId = [string]$mf.cli.aliases.be
+$bePath = Join-Path $Root ($mf.modules.$beModId.path -replace '/', '\')
 Add-Result "frontend path exists" (Test-Path $fePath) $fePath
 Add-Result "backend path exists" (Test-Path $bePath) $bePath
 if (-not $SkipNpm) {
@@ -106,7 +107,7 @@ if (-not $SkipDocker) {
 # 6 Mode 3 remote (config only - no SSH)
 Write-Host "--- 6. Mode 3 remote (config smoke) ---" -ForegroundColor Cyan
 $secretsRoot = Join-Path $Root ($mf.secrets -replace '/', '\')
-$beMod = $mf.modules.backend
+$beMod = $mf.modules.$beModId
 $feMod = $mf.modules.frontend
 $beDeploy = Join-Path $secretsRoot "$($beMod.secretsModule)\.env.deploy"
 $feDeploy = Join-Path $secretsRoot "$($feMod.secretsModule)\.env.deploy"

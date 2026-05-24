@@ -11,7 +11,7 @@ from lib.project_context import ProjectContext
 def test_discover_paths_from_manifest(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     assert ctx.secrets_root == repo_root / "ops" / "config"
-    assert ctx.module_path("backend") == repo_root / "apps" / "backend"
+    assert ctx.module_path("chat-api") == repo_root / "apps" / "backend"
     assert ctx.secrets_module_dir("frontend") == repo_root / "ops" / "config" / "frontend"
     assert ctx.stack_compose_dir == repo_root / "ops" / "compose" / "stack"
 
@@ -20,7 +20,7 @@ def test_gcp_optional_by_feature(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     assert ctx.feature_enabled("gcpCredentials") is True
     assert ctx.gcp_credentials_filename() == "google-credentials.json"
-    backend_creds = ctx.module_credentials_list("backend")
+    backend_creds = ctx.module_credentials_list("chat-api")
     assert backend_creds and backend_creds[0]["file"] == "google-credentials.json"
 
     off = {**manifest, "features": {"gcpCredentials": False}}
@@ -31,7 +31,7 @@ def test_gcp_optional_by_feature(repo_root: Path, manifest: dict) -> None:
 def test_compose_service_names_from_manifest(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     names = ctx.compose_service_names()
-    assert names["modules"]["backend"].endswith("-api")
+    assert names["modules"]["chat-api"].endswith("-api")
     assert names["modules"]["retrieval"].endswith("-retrieval")
     assert names["modules"]["ingestion"].endswith("-ingestion")
     assert names["worker"] == names["modules"]["ingestion"]

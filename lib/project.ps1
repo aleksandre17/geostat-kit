@@ -308,6 +308,10 @@ function Get-InfraSyncRelativePaths {
     if ((Test-Path (Join-Path $dir $prod)) -and -not ($paths -contains $prod)) {
         [void]$paths.Add($prod)
     }
+    $coexist = "docker-compose.coexist.yml"
+    if ((Test-Path (Join-Path $dir $coexist)) -and -not ($paths -contains $coexist)) {
+        [void]$paths.Add($coexist)
+    }
     $readme = "README.md"
     if ((Test-Path (Join-Path $dir $readme)) -and -not ($paths -contains $readme)) {
         [void]$paths.Add($readme)

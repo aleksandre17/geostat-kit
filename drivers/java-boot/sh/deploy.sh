@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Backend SSH deploy — orchestrator (kits/geostat-kit/toolkit/deploy/)
 #
 # Usage:
@@ -39,28 +39,26 @@ source "$DEPLOY_LIB/docker-up.sh"
 # shellcheck source=../../toolkit/deploy/gradle-modules.sh
 source "$DEPLOY_LIB/gradle-modules.sh"
 
-TARGET="backend"
 ENVIRONMENT="prod"
 SERVICE=""
 SKIP_BUILD=0
 SKIP_CHECKS=0
 
 for arg in "$@"; do
+  arg="${arg//$'\r'/}"
   case "$arg" in
     --no-build)    SKIP_BUILD=1 ;;
     --skip-checks) SKIP_CHECKS=1 ;;
     --dev)         ENVIRONMENT="dev" ;;
     --prod)        ENVIRONMENT="prod" ;;
     all)           SERVICE="all" ;;
-    backend)       TARGET="backend" ;;
-    frontend)      TARGET="frontend" ;;
+    backend|frontend) ;;
     *)             SERVICE="$arg" ;;
   esac
 done
 
 COMPOSE_FILE="docker-compose.${ENVIRONMENT}.yml"
 ENV_FILE=".env.${ENVIRONMENT}"
-REMOTE="$SERVER_BASE/$PROJECT/$TARGET"
 cd "$PROJECT_DIR" || exit 1
 
 discover_services
@@ -69,9 +67,14 @@ if [ ${#SERVICES[@]} -eq 0 ]; then
   exit 1
 fi
 
+apply_deploy_service_arg
+
+deploy_path_load_config
+DEPLOY_SUMMARY="$(deploy_path_summary)"
+
 if [ -z "$SERVICE" ]; then
   echo ""
-  echo "  Deployer  [$PROJECT/$TARGET] [$ENVIRONMENT]"
+  echo "  Deployer  [$DEPLOY_SUMMARY] [$ENVIRONMENT]"
   echo ""
   local_i=1
   for s in "${SERVICES[@]}"; do echo "     $((local_i++))) $s"; done
@@ -94,18 +97,17 @@ if [ "$SKIP_BUILD" = "0" ]; then
 fi
 
 if [ "$SKIP_CHECKS" = "0" ]; then
-  check_args="$SERVICE $TARGET"
+  check_args="$SERVICE"
   [ "$SKIP_BUILD" = "1" ] && check_args="$check_args --no-build"
   bash "$(dirname "$0")/check.sh" $check_args || exit 1
 fi
 
 DEPLOY_VERSION="$(date +%Y%m%d-%H%M%S)"
 echo ""
-echo "  Deploy [$SERVICE] → $PROJECT/$TARGET [$ENVIRONMENT]"
+echo "  Deploy [$SERVICE] → $DEPLOY_SUMMARY [$ENVIRONMENT]"
 if [ "$SKIP_BUILD" = "0" ] && [ -n "${GRADLE_PROPS:-}" ]; then
   echo "  Gradle: $GRADLE_PROPS"
 fi
-deploy_path_load_config
 for s in "${SERVICES[@]}"; do
   [ "$SERVICE" != "all" ] && [ "$SERVICE" != "$s" ] && continue
   echo "    $s → task $(module_gradle_boot_task "$s")  dir $(module_project_dir "$s")  server $(remote_path_for_service "$s")"
@@ -119,6 +121,9 @@ deploy_step_server_compose
 deploy_step_docker_up "$@"
 
 echo ""
-echo "  DONE — logs: $REMOTE/<svc>/logs/"
-echo "  Manage:  geostat be manage $SERVICE status --$ENVIRONMENT"
+for s in "${SERVICES[@]}"; do
+  [ "$SERVICE" != "all" ] && [ "$SERVICE" != "$s" ] && continue
+  echo "  DONE $s — logs: $(remote_path_for_service "$s")/logs/"
+done
+echo "  Manage:  geostat mod $GEOSTAT_MODULE_ID manage $SERVICE status --$ENVIRONMENT"
 echo ""

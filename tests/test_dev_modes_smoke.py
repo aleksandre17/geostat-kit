@@ -37,6 +37,39 @@ def test_mode1_local_host_launch_configs(repo_root: Path, manifest: dict) -> Non
     assert any(c.get("name") == "Full stack (local)" for c in compounds)
 
 
+def test_mode4_hybrid_compound_and_tunnel_task(repo_root: Path, manifest: dict) -> None:
+    stack = manifest.get("stack") or {}
+    infra = stack.get("infra") or {}
+    services = infra.get("services") or []
+    if not services:
+        pytest.skip("no stack.infra.services — hybrid compound not generated")
+
+    ctx = ProjectContext(root=repo_root, manifest=manifest)
+    launch = build_launch_json(ctx)
+    compounds = launch.get("compounds") or []
+    hybrid = next((c for c in compounds if c.get("preLaunchTask")), None)
+    assert hybrid is not None, "expected hybrid compound with preLaunchTask"
+    assert hybrid["preLaunchTask"] == "geostat: infra tunnel"
+    assert len(hybrid.get("configurations") or []) >= 2
+
+    tasks = build_tasks_json(ctx)
+    tunnel = next(t for t in tasks["tasks"] if t["label"] == "geostat: infra tunnel")
+    assert tunnel.get("isBackground") is True
+    assert "infra" in json.dumps(tunnel["args"])
+    assert "geostat: infra remote up" in [t["label"] for t in tasks["tasks"]]
+
+
+def test_java_launch_env_file_from_secrets(repo_root: Path, manifest: dict) -> None:
+    api_ids = modules_by_role(manifest, "api")
+    if not api_ids:
+        pytest.skip("no api module")
+    ctx = ProjectContext(root=repo_root, manifest=manifest)
+    launch = build_launch_json(ctx)
+    java_cfg = next(c for c in launch["configurations"] if c.get("type") == "java")
+    assert "envFile" in java_cfg
+    assert ".env.dev" in java_cfg["envFile"]
+
+
 def test_mode2_local_docker_tasks(repo_root: Path, manifest: dict) -> None:
     ctx = ProjectContext(root=repo_root, manifest=manifest)
     tasks = build_tasks_json(ctx)

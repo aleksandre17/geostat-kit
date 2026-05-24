@@ -11,6 +11,8 @@ FORBIDDEN_IN_RUNTIME = (
     re.compile(r"deploy/compose"),
     re.compile(r"\.\./secrets/"),
     re.compile(r"geostat-chat-bot", re.I),
+    re.compile(r"Hybrid\s*[④4]", re.I),
+    re.compile(r"\bfe\s*\|\s*be\s*\|\s*ret\s*\|\s*ing\b", re.I),
 )
 
 HARDCODED_SECRET_SUBDIR = re.compile(

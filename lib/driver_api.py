@@ -102,6 +102,15 @@ def resolve_alias(manifest: dict[str, Any], alias: str) -> str | None:
     return _resolve(alias, manifest)
 
 
+def resolve_module_id(manifest: dict[str, Any], module_or_alias: str) -> str:
+    target = resolve_alias(manifest, module_or_alias)
+    if not target:
+        raise SystemExit(
+            f"Unknown module or alias '{module_or_alias}' — add modules.{module_or_alias} or cli.aliases in geostat.ops.json"
+        )
+    return target
+
+
 def default_stack_deploy_steps(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     from lib.modules import default_stack_deploy_steps as _default
 
@@ -124,19 +133,19 @@ def substitute_stack_args(args: list[Any], environment: str) -> list[str]:
 
 def _cmd_type(root: Path, pkg: Path, module_id: str) -> None:
     m = load_manifest(root)
-    print(module_type(m, module_id))
+    print(module_type(m, resolve_module_id(m, module_id)))
 
 
 def _cmd_path(root: Path, pkg: Path, module_id: str, command: str) -> None:
     m = load_manifest(root)
     r = load_registry(pkg)
-    print(command_path(root, pkg, m, r, module_id, command))
+    print(command_path(root, pkg, m, r, resolve_module_id(m, module_id), command))
 
 
 def _cmd_caps(root: Path, pkg: Path, module_id: str) -> None:
     m = load_manifest(root)
     r = load_registry(pkg)
-    typ = module_type(m, module_id)
+    typ = module_type(m, resolve_module_id(m, module_id))
     print(" ".join(driver_capabilities(r, typ)))
 
 

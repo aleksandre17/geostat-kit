@@ -46,6 +46,10 @@
           "items": { "type": "string" },
           "description": "Module ids for stack compose-gen and stack-deploy auto-steps (default: all modules)"
         },
+        "deployBaseSecretsModule": {
+          "type": "string",
+          "description": "Secrets module id for shared DEPLOY_PATH/DEPLOY_LAYOUT (structured java-boot runtime base). Worker modules (retrieval, ingestion) inherit when their .env.deploy omits DEPLOY_PATH."
+        },
         "modules": {
           "type": "array",
           "items": { "type": "string" },
@@ -151,7 +155,18 @@
           },
           "target": {
             "type": "string",
-            "description": "Remote deploy path segment and compose name suffix (default: module id)"
+            "description": "Compose service name slug (e.g. retrieval → geostat-chat-ai-retrieval). NOT a server filesystem path under structured layout — JAR deploy uses stack.deployBaseSecretsModule DEPLOY_PATH + runtime/<container>/."
+          },
+          "compose": {
+            "type": "object",
+            "description": "Compose-gen options (P0-kit-13 embeddedWorker replaces catalog features.worker)",
+            "properties": {
+              "embeddedWorker": {
+                "type": "boolean",
+                "description": "Legacy apps/backend/worker sidecar next to primary api module"
+              }
+            },
+            "additionalProperties": false
           },
           "debug": {
             "type": "object",
@@ -171,6 +186,98 @@
               }
             },
             "additionalProperties": true
+          },
+          "hybrid": {
+            "type": "object",
+            "description": "Local host run (geostat hybrid boot / module run); springProfiles, gradleWrapper, npmScript",
+            "properties": {
+              "springProfiles": {
+                "type": "string",
+                "description": "SPRING_PROFILES_ACTIVE for java-boot local bootRun"
+              },
+              "gradleWrapper": {
+                "type": "string",
+                "description": "Path to gradlew relative to project root when not in module path"
+              },
+              "gradleProject": {
+                "type": "string",
+                "description": "Gradle subproject for :project:bootRun"
+              },
+              "npmScript": {
+                "type": "string",
+                "description": "npm script for node-vite (default: debug.npmScript or dev)"
+              }
+            },
+            "additionalProperties": false
+          },
+          "datastores": {
+            "type": "object",
+            "description": "P0-kit-09 config-gen: postgres/rabbitmq/qdrant declarations",
+            "properties": {
+              "postgres": {
+                "type": "object",
+                "properties": {
+                  "schema": { "type": "string" },
+                  "database": { "type": "string" },
+                  "flyway": { "type": "boolean" }
+                },
+                "additionalProperties": false
+              },
+              "rabbitmq": { "type": "object", "additionalProperties": true },
+              "qdrant": { "type": "object", "additionalProperties": true },
+              "events": {
+                "type": "object",
+                "properties": {
+                  "enabledEnv": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "spring": {
+            "type": "object",
+            "description": "config-gen Spring profile layout",
+            "properties": {
+              "applicationName": { "type": "string" },
+              "defaultProfile": { "type": "string" },
+              "portEnv": {
+                "type": "string",
+                "description": "Env var for server.port (default: {secretsModule}_PORT)"
+              },
+              "profileGroups": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "envProfiles": {
+                "type": "object",
+                "description": "env-profiles mode: local/dev/prod → secrets env file",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "envFile": { "type": "string" },
+                    "devtools": { "type": "boolean" },
+                    "prodLogging": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "configGen": {
+            "type": "object",
+            "description": "P0-kit-09 config-gen mode",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["simple", "postgres-profiles", "env-profiles"]
+              }
+            },
+            "additionalProperties": false
           }
         }
       }
@@ -179,7 +286,18 @@
       "type": "object",
       "properties": {
         "folder": { "type": "string" },
-        "geostatScript": { "type": "string" }
+        "geostatScript": { "type": "string" },
+        "hybrid": {
+          "type": "object",
+          "description": "P0-infra-07 hybrid compound (tunnel preLaunch + API + UI)",
+          "properties": {
+            "compoundName": { "type": "string" },
+            "apiModule": { "type": "string" },
+            "uiModule": { "type": "string" },
+            "preLaunchTask": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -225,6 +343,11 @@
         "prepareEnv": { "type": "string" },
         "waitHealth": { "type": "string" },
         "waitStackHealth": { "type": "string" },
+        "ragSmoke": { "type": "string" },
+        "chatCatalogRagSmoke": { "type": "string" },
+        "chatRagE2eSmoke": { "type": "string" },
+        "verifyServicesProd": { "type": "string" },
+        "corpusQualityAudit": { "type": "string" },
         "healthModules": {
           "type": "array",
           "items": { "type": "string" }

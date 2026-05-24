@@ -18,6 +18,12 @@ param(
 $GetComposeServices = Join-Path $env:GEOSTAT_KIT_ROOT "toolkit\powershell\Get-ComposeServices.ps1"
 . $GetComposeServices
 
+# geostat mod fe deploy dist -Environment prod → ("dist","-Environment","prod") via @rest
+if ($Arg2 -eq "-Environment" -and $args.Count -ge 1 -and $args[0] -in @("dev", "prod")) {
+    $Environment = [string]$args[0]
+    $Arg2 = ""
+}
+
 $_validModes = @("local", "dist", "remote", "sync", "watch")
 $_modeHints  = @(
     "Build Docker image here, run container locally",
@@ -47,7 +53,7 @@ elseif ($Arg1 -in $_validModes) { $Mode = $Arg1 }
 elseif ($Arg1) { $ServiceName = $Arg1 }
 
 $extraCompose = if ($Environment -eq "dev") { @("docker-compose.override.yml") } else { @("docker-compose.prod.yml") }
-$_services = Get-ComposeServicesFromFile -ModuleRoot $ROOT -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose
+$_services = @(Get-ComposeServicesFromFile -ModuleRoot $ROOT -ComposeFile "docker-compose.yml" -ExtraComposeFiles $extraCompose)
 $_serviceNames = @($_services | ForEach-Object { $_.Name })
 
 if ($ServiceName) {

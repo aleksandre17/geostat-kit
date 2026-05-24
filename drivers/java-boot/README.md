@@ -9,6 +9,7 @@ Gradle / Spring Boot multi-module deploy and remote dev for `geostat.ops.json` m
 | `be deploy [svc] --dev\|--prod` | JAR + Dockerfile → `runtime/{container}/` |
 | `be deploy watch [svc]` | Debounced bootJar → upload → `compose up --build` |
 | `be dev bootstrap\|sync\|watch\|restart` | rsync source → `workspace/{container}/` + bootRun |
+| `run` | Local `bootRun` + secrets `.env.dev` (manifest `modules.*.hybrid`) |
 | `be manage` | stop/start/logs on server runtime paths |
 | `be compose` | Local `docker-compose.dev.yml` / prod |
 | `be check` | Pre-flight before deploy |
