@@ -48,7 +48,7 @@ switch ($driverType) {
             if ($jar -and (Test-Path $jar)) {
                 Invoke-GeostatHybridJarBoot -Root $root -ModuleId $ModuleId -ModPath $modPath
             } else {
-                Write-Host "[hybrid] boot JAR missing — falling back to gradle bootRun (build first or set hybrid.bootJar)" -ForegroundColor Yellow
+                Write-Host "[hybrid] boot JAR missing - falling back to gradle bootRun (build first or set hybrid.bootJar)" -ForegroundColor Yellow
             }
         }
 
@@ -87,6 +87,6 @@ switch ($driverType) {
         exit $LASTEXITCODE
     }
     default {
-        throw "Hybrid run not supported for driver type '$driverType' (module $ModuleId)"
+        throw ('Hybrid run not supported for driver type ''{0}'' (module {1})' -f $driverType, $ModuleId)
     }
 }

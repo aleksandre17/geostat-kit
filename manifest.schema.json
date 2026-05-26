@@ -206,6 +206,14 @@
               "npmScript": {
                 "type": "string",
                 "description": "npm script for node-vite (default: debug.npmScript or dev)"
+              },
+              "preferJar": {
+                "type": "boolean",
+                "description": "Prefer pre-built JAR over Gradle bootRun for faster startup (requires bootJar)"
+              },
+              "bootJar": {
+                "type": "string",
+                "description": "Path to pre-built Spring Boot JAR for hybrid preferJar mode"
               }
             },
             "additionalProperties": false
@@ -278,6 +286,63 @@
               }
             },
             "additionalProperties": false
+          },
+          "catalog": {
+            "type": "object",
+            "description": "Chat catalog source configuration (yaml vs derived)",
+            "properties": {
+              "sourceEnv": { "type": "string" },
+              "defaultSource": { "type": "string" },
+              "cutoverSource": { "type": "string" },
+              "jdbcUrlEnv": { "type": "string" },
+              "jdbcUserEnv": { "type": "string" },
+              "jdbcPasswordEnv": { "type": "string" },
+              "presentationResources": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          },
+          "derivation": {
+            "type": "object",
+            "description": "Derivation pipeline configuration (Phase 8 P1 enrichment + clustering)",
+            "properties": {
+              "phase": { "type": "string" },
+              "planDoc": { "type": "string" },
+              "defaultCorpus": { "type": "string" },
+              "flywayRange": { "type": "string" },
+              "enrichment": {
+                "type": "object",
+                "properties": {
+                  "enabledEnv": { "type": "string" },
+                  "chatModelEnv": { "type": "string" },
+                  "modelVersionEnv": { "type": "string" },
+                  "defaultChatModel": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "aggregation": {
+                "type": "object",
+                "properties": {
+                  "enabledEnv": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "cutover": {
+                "type": "object",
+                "properties": {
+                  "orchestrator": { "type": "string" },
+                  "prep": { "type": "string" },
+                  "evalGate": { "type": "string" },
+                  "freezeBaseline": { "type": "string" },
+                  "frozenBaselinePath": { "type": "string" },
+                  "derivedSmoke": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
           }
         }
       }
@@ -345,9 +410,18 @@
         "waitStackHealth": { "type": "string" },
         "ragSmoke": { "type": "string" },
         "chatCatalogRagSmoke": { "type": "string" },
+        "chatDerivedCatalogSmoke": { "type": "string", "description": "P1 derived catalog smoke test" },
         "chatRagE2eSmoke": { "type": "string" },
         "verifyServicesProd": { "type": "string" },
         "corpusQualityAudit": { "type": "string" },
+        "ragEvalSmoke": { "type": "string", "description": "RAG eval dry-run / smoke" },
+        "ragEvalHarness": { "type": "string", "description": "RAG eval full harness" },
+        "ragEvalGate": { "type": "string", "description": "RAG eval gate (pass/fail)" },
+        "ragEvalFreezeYamlBaseline": { "type": "string", "description": "Freeze YAML catalog baseline for eval" },
+        "ragDerivationCutoverPrep": { "type": "string", "description": "Phase 8 P1 derivation cutover prep" },
+        "ragP0CorpusQuality": { "type": "string", "description": "P0 Layer 1 corpus quality gate" },
+        "ragP1Cutover": { "type": "string", "description": "Phase 8 P1 full cutover orchestrator" },
+        "ragLocalePipeline": { "type": "string", "description": "Locale pair pipeline orchestrator" },
         "healthModules": {
           "type": "array",
           "items": { "type": "string" }
